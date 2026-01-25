@@ -129,7 +129,7 @@ print_info "Configurando variáveis de ambiente..."
 
 if [ ! -f .env ]; then
     cat > .env << 'EOF'
-# Banco de Dados (SQLite para desenvolvimento)
+# Banco de Dados (SQLite - recomendado para Google Cloud Shell)
 DATABASE_URL=file:./dev.db
 
 # Servidor
@@ -172,7 +172,7 @@ print_success "Dependências instaladas"
 
 print_info "Aplicando migrações do banco de dados..."
 
-pnpm db:push
+DATABASE_URL="file:./dev.db" pnpm db:push
 
 print_success "Banco de dados configurado"
 

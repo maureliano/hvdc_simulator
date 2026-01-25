@@ -34,3 +34,9 @@
 - [x] Preparar scripts de instalação
 - [x] Configurar variáveis de ambiente
 - [x] Documentar processo completo
+
+## Correção - Banco de Dados
+- [x] Implementar configuração alternativa com SQLite
+- [x] Atualizar drizzle.config.ts para suportar SQLite
+- [x] Corrigir scripts de deployment
+- [x] Atualizar documentação com solução

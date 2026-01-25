@@ -1,18 +1,28 @@
-import { eq, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
 import { InsertUser, users, circuitConfigs, simulationResults, InsertCircuitConfig, InsertSimulationResult } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sqlite: Database.Database | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      // Extrair caminho do arquivo SQLite da URL
+      const dbPath = process.env.DATABASE_URL.replace("file:", "");
+      
+      // Criar conexão SQLite
+      _sqlite = new Database(dbPath);
+      _db = drizzle(_sqlite);
+      
+      console.log(`[Database] Connected to SQLite: ${dbPath}`);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      _sqlite = null;
     }
   }
   return _db;
@@ -33,7 +43,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = {
       openId: user.openId,
     };
-    const updateSet: Record<string, unknown> = {};
 
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
@@ -42,35 +51,39 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       const value = user[field];
       if (value === undefined) return;
       const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
+      values[field] = normalized as any;
     };
 
     textFields.forEach(assignNullable);
 
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
     }
     if (user.role !== undefined) {
       values.role = user.role;
-      updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
       values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
       values.lastSignedIn = new Date();
     }
 
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
+    // SQLite: usar INSERT OR REPLACE
+    const existing = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1);
+    
+    if (existing.length > 0) {
+      // Update
+      await db.update(users)
+        .set({
+          ...values,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.openId, user.openId));
+    } else {
+      // Insert
+      await db.insert(users).values(values);
     }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -89,62 +102,82 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// Circuit configuration queries
+/**
+ * Circuit Configuration Functions
+ */
+
 export async function createCircuitConfig(config: InsertCircuitConfig) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  const result = await db.insert(circuitConfigs).values(config);
-  return result;
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const result = await db.insert(circuitConfigs).values(config).returning();
+  return result[0];
 }
 
-export async function getCircuitConfigsByUser(userId: number) {
+export async function getCircuitConfigsByUserId(userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  return await db.select().from(circuitConfigs).where(eq(circuitConfigs.userId, userId)).orderBy(desc(circuitConfigs.updatedAt));
+  if (!db) {
+    return [];
+  }
+
+  return await db.select().from(circuitConfigs).where(eq(circuitConfigs.userId, userId));
 }
 
 export async function getCircuitConfigById(id: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
+  if (!db) {
+    return undefined;
+  }
+
   const result = await db.select().from(circuitConfigs).where(eq(circuitConfigs.id, id)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function updateCircuitConfig(id: number, config: Partial<InsertCircuitConfig>) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  return await db.update(circuitConfigs).set(config).where(eq(circuitConfigs.id, id));
-}
-
 export async function deleteCircuitConfig(id: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  return await db.delete(circuitConfigs).where(eq(circuitConfigs.id, id));
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db.delete(circuitConfigs).where(eq(circuitConfigs.id, id));
 }
 
-// Simulation results queries
-export async function createSimulationResult(result: InsertSimulationResult) {
+/**
+ * Simulation Results Functions
+ */
+
+export async function saveSimulationResult(result: InsertSimulationResult) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  return await db.insert(simulationResults).values(result);
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const inserted = await db.insert(simulationResults).values(result).returning();
+  return inserted[0];
 }
 
-export async function getSimulationResultsByUser(userId: number, limit: number = 50) {
+export async function getSimulationResultsByUserId(userId: number, limit: number = 50) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  return await db.select().from(simulationResults).where(eq(simulationResults.userId, userId)).orderBy(desc(simulationResults.createdAt)).limit(limit);
+  if (!db) {
+    return [];
+  }
+
+  return await db
+    .select()
+    .from(simulationResults)
+    .where(eq(simulationResults.userId, userId))
+    .limit(limit)
+    .orderBy(simulationResults.createdAt);
 }
 
-export async function getSimulationResultsByConfig(configId: number, limit: number = 20) {
+export async function getSimulationResultById(id: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  
-  return await db.select().from(simulationResults).where(eq(simulationResults.configId, configId)).orderBy(desc(simulationResults.createdAt)).limit(limit);
+  if (!db) {
+    return undefined;
+  }
+
+  const result = await db.select().from(simulationResults).where(eq(simulationResults.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }

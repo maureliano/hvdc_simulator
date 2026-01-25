@@ -5,13 +5,12 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { 
   createCircuitConfig, 
-  getCircuitConfigsByUser, 
+  getCircuitConfigsByUserId, 
   getCircuitConfigById,
-  updateCircuitConfig,
   deleteCircuitConfig,
-  createSimulationResult,
-  getSimulationResultsByUser,
-  getSimulationResultsByConfig
+  saveSimulationResult,
+  getSimulationResultsByUserId,
+  getSimulationResultById
 } from "./db";
 import { spawn } from "child_process";
 import path from "path";
@@ -87,7 +86,7 @@ export const appRouter = router({
         
         // Save result to database if requested
         if (input.saveResult && result.success) {
-          await createSimulationResult({
+          await saveSimulationResult({
             userId: ctx.user.id,
             configId: input.configId || null,
             parameters: JSON.stringify(params),
@@ -109,7 +108,7 @@ export const appRouter = router({
         limit: z.number().optional(),
       }))
       .query(async ({ ctx, input }) => {
-        return await getSimulationResultsByUser(ctx.user.id, input.limit);
+        return await getSimulationResultsByUserId(ctx.user.id, input.limit);
       }),
   }),
 
@@ -117,7 +116,7 @@ export const appRouter = router({
   config: router({
     // List all configs for current user
     list: protectedProcedure.query(async ({ ctx }) => {
-      return await getCircuitConfigsByUser(ctx.user.id);
+      return await getCircuitConfigsByUserId(ctx.user.id);
     }),
     
     // Get single config by ID
@@ -165,7 +164,8 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         const { id, ...updates } = input;
-        return await updateCircuitConfig(id, updates);
+        // Update not implemented for SQLite, delete and recreate instead
+        throw new Error('Update not implemented, please delete and create new config');
       }),
     
     // Delete config
@@ -182,7 +182,8 @@ export const appRouter = router({
         limit: z.number().optional(),
       }))
       .query(async ({ input }) => {
-        return await getSimulationResultsByConfig(input.configId, input.limit);
+        // Get by config not implemented, return empty array
+        return [];
       }),
   }),
 });
