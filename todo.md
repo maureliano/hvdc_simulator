@@ -28,3 +28,9 @@
 - [x] Testar simulação completa do circuito
 - [x] Validar interface e experiência do usuário
 - [x] Criar checkpoint final
+
+## Deployment Google Cloud Shell
+- [x] Criar documentação de deployment
+- [x] Preparar scripts de instalação
+- [x] Configurar variáveis de ambiente
+- [x] Documentar processo completo
