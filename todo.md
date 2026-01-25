@@ -52,3 +52,8 @@
 - [x] Atualizar frontend para não requerer login
 - [x] Criar modo público de acesso direto
 - [x] Atualizar documentação
+
+## Correção - Docker build externally-managed-environment
+- [x] Corrigir Dockerfile para usar --break-system-packages
+- [x] Testar build do Docker
+- [x] Atualizar documentação de deployment

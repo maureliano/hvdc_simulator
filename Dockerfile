@@ -31,7 +31,8 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Instalar Pandapower e dependências Python
-RUN pip3 install --no-cache-dir \
+# Usar --break-system-packages para Alpine Linux 3.19+
+RUN pip3 install --no-cache-dir --break-system-packages \
     pandapower==3.3.2 \
     numpy \
     matplotlib \
@@ -61,7 +62,8 @@ RUN addgroup -g 1001 -S nodejs && \
 WORKDIR /app
 
 # Instalar Pandapower (runtime)
-RUN pip3 install --no-cache-dir \
+# Usar --break-system-packages para Alpine Linux 3.19+
+RUN pip3 install --no-cache-dir --break-system-packages \
     pandapower==3.3.2 \
     numpy \
     matplotlib \
