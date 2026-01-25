@@ -62,8 +62,8 @@ export const appRouter = router({
 
   // HVDC Simulation router
   simulation: router({
-    // Run simulation with parameters
-    run: protectedProcedure
+    // Run simulation with parameters (public access for standalone mode)
+    run: publicProcedure
       .input(z.object({
         ac1_voltage: z.number().optional(),
         ac2_voltage: z.number().optional(),
@@ -84,8 +84,8 @@ export const appRouter = router({
         
         const result = await runPythonSimulation(params);
         
-        // Save result to database if requested
-        if (input.saveResult && result.success) {
+        // Save result to database if requested (only when authenticated)
+        if (input.saveResult && result.success && ctx.user) {
           await saveSimulationResult({
             userId: ctx.user.id,
             configId: input.configId || null,

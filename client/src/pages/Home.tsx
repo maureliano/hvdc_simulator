@@ -41,7 +41,7 @@ export default function Home() {
     setIsSimulating(true);
     runSimulation.mutate({
       ...simulationParams,
-      saveResult: true,
+      saveResult: false, // Standalone mode: no database saving
     });
   };
 

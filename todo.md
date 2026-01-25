@@ -46,3 +46,9 @@
 - [x] Criar guia alternativo usando NPM
 - [x] Adicionar verificação de pré-requisitos
 - [x] Testar instalação completa
+
+## Correção - Remover OAuth para modo standalone
+- [x] Desabilitar autenticação OAuth no backend
+- [x] Atualizar frontend para não requerer login
+- [x] Criar modo público de acesso direto
+- [x] Atualizar documentação
