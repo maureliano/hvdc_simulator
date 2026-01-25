@@ -40,3 +40,9 @@
 - [x] Atualizar drizzle.config.ts para suportar SQLite
 - [x] Corrigir scripts de deployment
 - [x] Atualizar documentação com solução
+
+## Correção - PNPM não encontrado
+- [x] Atualizar deploy-gcloud.sh com instalação de Node.js e PNPM
+- [x] Criar guia alternativo usando NPM
+- [x] Adicionar verificação de pré-requisitos
+- [x] Testar instalação completa
