@@ -57,3 +57,15 @@
 - [x] Corrigir Dockerfile para usar --break-system-packages
 - [x] Testar build do Docker
 - [x] Atualizar documentação de deployment
+
+## Dashboard Supervisório (SCADA) em Tempo Real
+- [x] Implementar WebSocket para streaming de dados
+- [x] Criar API de monitoramento contínuo
+- [x] Desenvolver dashboard supervisório com atualização automática
+- [x] Adicionar visualização de métricas em tempo real
+- [x] Implementar sistema de alarmes e limites
+- [x] Criar notificações para eventos críticos
+- [x] Adicionar histórico de eventos
+- [x] Implementar gráficos de tendência temporal
+- [x] Criar indicadores visuais de status (LEDs, gauges)
+- [x] Testar sistema completo
