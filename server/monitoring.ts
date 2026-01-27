@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from "socket.io";
 import type { Server as HTTPServer } from "http";
 import { spawn } from "child_process";
 import path from "path";
+import { checkIFFTestResultForAlarms, getActiveAlarmEvents } from "./iff/alarm-service";
 
 /**
  * Serviço de Monitoramento em Tempo Real
@@ -93,6 +94,9 @@ export class MonitoringService {
       socket.on("disconnect", () => {
         console.log(`[Monitoring] Client disconnected: ${socket.id}`);
       });
+
+      // Enviar alarmes ativos ao conectar
+      this.emitActiveAlarms();
     });
 
     // Iniciar monitoramento contínuo (atualização a cada 2 segundos)
@@ -117,13 +121,47 @@ export class MonitoringService {
       if (this.io) {
         this.io.emit("monitoringData", monitoringData);
       }
+      await this.emitActiveAlarms();
     } catch (error) {
       console.error("[Monitoring] Simulation error:", error);
-      // Fallback: enviar dados simulados quando Pandapower falha
       const fallbackData = this.generateFallbackData();
       if (this.io) {
         this.io.emit("monitoringData", fallbackData);
       }
+      await this.emitActiveAlarms();
+    }
+  }
+
+  private async emitActiveAlarms() {
+    try {
+      const alarms = await getActiveAlarmEvents(undefined, 100);
+      if (this.io && alarms.length > 0) {
+        this.io.emit("alarmEvents", {
+          timestamp: Date.now(),
+          activeAlarms: alarms,
+          totalActive: alarms.length,
+        });
+      }
+    } catch (error) {
+      console.error("[Monitoring] Error emitting alarms:", error);
+    }
+  }
+
+  async checkTestResultForAlarms(testResultId: number, userId?: number) {
+    try {
+      const newAlarms = await checkIFFTestResultForAlarms(testResultId, userId);
+      if (this.io && newAlarms.length > 0) {
+        this.io.emit("newAlarmEvents", {
+          timestamp: Date.now(),
+          newAlarms,
+          count: newAlarms.length,
+        });
+        console.log(`[Monitoring] Emitted ${newAlarms.length} new alarm events`);
+      }
+      return newAlarms;
+    } catch (error) {
+      console.error("[Monitoring] Error checking test result for alarms:", error);
+      return [];
     }
   }
 

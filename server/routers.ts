@@ -22,6 +22,18 @@ import {
   deleteIFFTest,
   getIFFTrend
 } from "./iff-db";
+import {
+  getAlarmThresholds,
+  createAlarmThreshold,
+  updateAlarmThreshold,
+  deleteAlarmThreshold,
+  getActiveAlarmEvents,
+  getAlarmEventHistory,
+  acknowledgeAlarmEvent,
+  resolveAlarmEvent,
+  checkIFFTestResultForAlarms,
+  getAlarmStatistics
+} from "./iff/alarm-service";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -213,6 +225,121 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => {
         return await getIFFTestStatistics(input.userId);
+      }),
+  }),
+
+  // Alarm management router
+  alarms: router({
+    // Get configured thresholds
+    getThresholds: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmThresholds(input.userId);
+      }),
+
+    // Create new alarm threshold
+    createThreshold: publicProcedure
+      .input(z.object({
+        metricName: z.string(),
+        criticalThreshold: z.number(),
+        warningThreshold: z.number(),
+        userId: z.number().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await createAlarmThreshold(
+          input.metricName,
+          input.criticalThreshold,
+          input.warningThreshold,
+          input.userId,
+          input.description
+        );
+      }),
+
+    // Update alarm threshold
+    updateThreshold: publicProcedure
+      .input(z.object({
+        id: z.number(),
+        criticalThreshold: z.number().optional(),
+        warningThreshold: z.number().optional(),
+        enabled: z.boolean().optional(),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const { id, ...updates } = input;
+        return await updateAlarmThreshold(id, updates);
+      }),
+
+    // Delete alarm threshold
+    deleteThreshold: publicProcedure
+      .input(z.object({
+        id: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        return await deleteAlarmThreshold(input.id);
+      }),
+
+    // Get active alarm events
+    getActiveAlarms: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        limit: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getActiveAlarmEvents(input.userId, input.limit);
+      }),
+
+    // Get alarm event history
+    getHistory: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmEventHistory(input.userId, input.limit, input.offset);
+      }),
+
+    // Acknowledge alarm event
+    acknowledge: publicProcedure
+      .input(z.object({
+        id: z.number(),
+        acknowledgedBy: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        return await acknowledgeAlarmEvent(input.id, input.acknowledgedBy);
+      }),
+
+    // Resolve alarm event
+    resolve: publicProcedure
+      .input(z.object({
+        id: z.number(),
+        resolvedBy: z.string(),
+        resolutionNotes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await resolveAlarmEvent(input.id, input.resolvedBy, input.resolutionNotes);
+      }),
+
+    // Check test result for alarms
+    checkTestResult: publicProcedure
+      .input(z.object({
+        testResultId: z.number(),
+        userId: z.number().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await checkIFFTestResultForAlarms(input.testResultId, input.userId);
+      }),
+
+    // Get alarm statistics
+    getStatistics: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmStatistics(input.userId);
       }),
   }),
 });

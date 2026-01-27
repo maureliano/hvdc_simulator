@@ -109,3 +109,12 @@
 - [x] Adicionar endpoints tRPC para gerenciar testes
 - [x] Atualizar dashboard para usar dados persistidos
 - [x] Testar integração completa
+
+## Sistema de Notificações de Alarme IFF
+- [x] Atualizar schema do banco para tabelas de alarmes (iffAlarmThresholds, iffAlarmEvents)
+- [x] Criar serviço de monitoramento de alarmes com lógica de threshold
+- [x] Implementar endpoints tRPC para gerenciar alarmes (criar, atualizar, listar, resolver)
+- [x] Integrar notificações em tempo real via WebSocket
+- [x] Criar componente UI de painel de alarmes no dashboard
+- [x] Adicionar testes vitest para sistema de alarmes
+- [x] Atualizar documentação com guia de alarmes

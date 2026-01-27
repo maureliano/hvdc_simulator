@@ -1,19 +1,12 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
+  "version": "7",
+  "dialect": "mysql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1769354296325,
-      "tag": "0000_simple_archangel",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1769523800653,
-      "tag": "0001_low_molecule_man",
+      "version": "5",
+      "when": 1769535742002,
+      "tag": "0000_chilly_toxin",
       "breakpoints": true
     }
   ]
