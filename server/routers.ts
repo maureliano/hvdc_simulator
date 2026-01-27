@@ -12,6 +12,16 @@ import {
   getSimulationResultsByUserId,
   getSimulationResultById
 } from "./db";
+import {
+  saveIFFTestResult,
+  getIFFTestHistory,
+  getIFFTestResult,
+  saveIFFTestEvent,
+  getIFFTestEvents,
+  getIFFTestStatistics,
+  deleteIFFTest,
+  getIFFTrend
+} from "./iff-db";
 import { spawn } from "child_process";
 import path from "path";
 
@@ -19,31 +29,45 @@ import path from "path";
 // Helper function to run Python simulation
 function runPythonSimulation(params: any): Promise<any> {
   return new Promise((resolve, reject) => {
-    const pythonScript = path.join(process.cwd(), 'server', 'hvdc_simulator.py');
-    const python = spawn('/usr/bin/python3', [pythonScript, JSON.stringify(params)]);
-    
-    let stdout = '';
-    let stderr = '';
-    
-    python.stdout.on('data', (data) => {
+    const pythonScript = path.join(process.cwd(), "server", "hvdc_simulator.py");
+    const args = [
+      String(params.ac1Voltage || 345),
+      String(params.ac2Voltage || 230),
+      String(params.dcVoltage || 422.84),
+      String(params.loadMw || 1000),
+    ];
+
+    const python = spawn("python3", [pythonScript, ...args], {
+      cwd: process.cwd(),
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    python.stdout.on("data", (data) => {
       stdout += data.toString();
     });
-    
-    python.stderr.on('data', (data) => {
+
+    python.stderr.on("data", (data) => {
       stderr += data.toString();
     });
-    
-    python.on('close', (code) => {
+
+    python.on("close", (code) => {
       if (code !== 0) {
         reject(new Error(`Python script failed: ${stderr}`));
-      } else {
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result);
-        } catch (e) {
-          reject(new Error(`Failed to parse simulation results: ${e}`));
-        }
+        return;
       }
+
+      try {
+        const result = JSON.parse(stdout);
+        resolve(result);
+      } catch (error) {
+        reject(new Error(`Failed to parse simulation result: ${error}`));
+      }
+    });
+
+    python.on("error", (error) => {
+      reject(error);
     });
   });
 }
@@ -61,114 +85,65 @@ export const appRouter = router({
     }),
   }),
 
-  // HVDC Simulation router
-  simulation: router({
-    // Run simulation with parameters (public access for standalone mode)
-    run: publicProcedure
+  // Circuit simulation router
+  circuit: router({
+    // Run simulation
+    simulate: publicProcedure
       .input(z.object({
-        ac1_voltage: z.number().optional(),
-        ac2_voltage: z.number().optional(),
-        dc_voltage: z.number().optional(),
-        power_mva: z.number().optional(),
-        load_mw: z.number().optional(),
-        saveResult: z.boolean().optional(),
-        configId: z.number().optional(),
+        ac1Voltage: z.number().optional(),
+        ac2Voltage: z.number().optional(),
+        dcVoltage: z.number().optional(),
+        loadMw: z.number().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
-        const params = {
-          ac1_voltage: input.ac1_voltage,
-          ac2_voltage: input.ac2_voltage,
-          dc_voltage: input.dc_voltage,
-          power_mva: input.power_mva,
-          load_mw: input.load_mw,
-        };
-        
-        const result = await runPythonSimulation(params);
-        
-        // Save result to database if requested (only when authenticated)
-        if (input.saveResult && result.success && ctx.user) {
-          await saveSimulationResult({
-            userId: ctx.user.id,
-            configId: input.configId || null,
-            parameters: JSON.stringify(params),
-            totalGenerationMw: result.summary.total_generation_mw,
-            totalLoadMw: result.summary.total_load_mw,
-            totalLossesMw: result.summary.total_losses_mw,
-            efficiencyPercent: result.summary.efficiency_percent,
-            converged: result.summary.converged ? 1 : 0,
-            fullResults: JSON.stringify(result),
-          });
+      .mutation(async ({ input }) => {
+        try {
+          const result = await runPythonSimulation(input);
+          return result;
+        } catch (error) {
+          console.error("[Simulation] Error:", error);
+          throw error;
         }
-        
-        return result;
       }),
-    
-    // Get simulation history
-    history: protectedProcedure
-      .input(z.object({
-        limit: z.number().optional(),
-      }))
-      .query(async ({ ctx, input }) => {
-        return await getSimulationResultsByUserId(ctx.user.id, input.limit);
-      }),
-  }),
 
-  // Circuit configuration router
-  config: router({
-    // List all configs for current user
-    list: protectedProcedure.query(async ({ ctx }) => {
-      return await getCircuitConfigsByUserId(ctx.user.id);
-    }),
-    
-    // Get single config by ID
-    get: protectedProcedure
+    // Save configuration
+    saveConfig: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        ac1Voltage: z.number(),
+        ac2Voltage: z.number(),
+        dcVoltage: z.number(),
+        powerMva: z.number(),
+        loadMw: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) return null;
+        return await createCircuitConfig({
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description,
+          ac1Voltage: input.ac1Voltage,
+          ac2Voltage: input.ac2Voltage,
+          dcVoltage: input.dcVoltage,
+          powerMva: input.powerMva,
+          loadMw: input.loadMw,
+        });
+      }),
+
+    // Get configurations
+    getConfigs: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) return [];
+        return await getCircuitConfigsByUserId(ctx.user.id);
+      }),
+
+    // Get specific configuration
+    getConfig: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return await getCircuitConfigById(input.id);
       }),
-    
-    // Create new config
-    create: protectedProcedure
-      .input(z.object({
-        name: z.string(),
-        description: z.string().optional(),
-        ac1Voltage: z.number().optional(),
-        ac2Voltage: z.number().optional(),
-        dcVoltage: z.number().optional(),
-        powerMva: z.number().optional(),
-        loadMw: z.number().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        return await createCircuitConfig({
-          userId: ctx.user.id,
-          name: input.name,
-          description: input.description || null,
-          ac1Voltage: input.ac1Voltage || 345.0,
-          ac2Voltage: input.ac2Voltage || 230.0,
-          dcVoltage: input.dcVoltage || 422.84,
-          powerMva: input.powerMva || 1196.0,
-          loadMw: input.loadMw || 1000.0,
-        });
-      }),
-    
-    // Update existing config
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        name: z.string().optional(),
-        description: z.string().optional(),
-        ac1Voltage: z.number().optional(),
-        ac2Voltage: z.number().optional(),
-        dcVoltage: z.number().optional(),
-        powerMva: z.number().optional(),
-        loadMw: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const { id, ...updates } = input;
-        // Update not implemented for SQLite, delete and recreate instead
-        throw new Error('Update not implemented, please delete and create new config');
-      }),
-    
+
     // Delete config
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -185,6 +160,59 @@ export const appRouter = router({
       .query(async ({ input }) => {
         // Get by config not implemented, return empty array
         return [];
+      }),
+  }),
+
+  // IFF Framework router
+  iff: router({
+    saveTestResult: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        testName: z.string(),
+        scenarioType: z.string(),
+        executionTime: z.number(),
+        overallIFFScore: z.number(),
+        systemTrustworthiness: z.string(),
+        agenticDecision: z.string(),
+        fullResults: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        return await saveIFFTestResult({
+          userId: input.userId,
+          scenarioId: undefined,
+          testName: input.testName,
+          scenarioType: input.scenarioType,
+          executionTime: input.executionTime,
+          overallIFFScore: input.overallIFFScore,
+          systemTrustworthiness: input.systemTrustworthiness,
+          agenticDecision: input.agenticDecision,
+          fullResults: input.fullResults,
+        });
+      }),
+
+    getHistory: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        limit: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getIFFTestHistory(input.userId, input.limit || 100);
+      }),
+
+    getTrend: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getIFFTrend(input.userId);
+      }),
+
+    getStatistics: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getIFFTestStatistics(input.userId);
       }),
   }),
 });

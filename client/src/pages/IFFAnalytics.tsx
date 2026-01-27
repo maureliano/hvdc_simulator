@@ -1,486 +1,274 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
-  ScatterChart,
-  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
-  Area,
-  AreaChart,
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, TrendingUp, Activity, Shield, Zap } from "lucide-react";
+import { AlertCircle, TrendingUp, Activity, Shield } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+
+interface IFFReport {
+  timestamp: number;
+  overall_iff_score: number;
+  system_trustworthiness: "high" | "medium" | "low";
+  agentic_decision: {
+    action: "ALLOW" | "BLOCK";
+  };
+}
 
 function generateDemoData() {
   const reports: IFFReport[] = [];
   const now = Date.now();
-  
+
   for (let i = 100; i > 0; i--) {
     const timestamp = now - i * 60000;
     const baseScore = 0.75 + Math.random() * 0.2;
-    
+
     reports.push({
       timestamp,
       overall_iff_score: baseScore,
       system_trustworthiness: baseScore > 0.85 ? "high" : baseScore > 0.7 ? "medium" : "low",
-      dynamic_fidelity: {
-        dynamic_fidelity_index: baseScore,
-        status: baseScore > 0.85 ? "excellent" : baseScore > 0.7 ? "good" : "acceptable",
-      },
-      uncertainty_analysis: {
-        overall_uncertainty_percent: Math.random() * 10,
-        confidence_level: 0.8 + Math.random() * 0.2,
-      },
       agentic_decision: {
         action: Math.random() > 0.7 ? "BLOCK" : "ALLOW",
       },
     });
   }
-  
-  return { reports };
-}
 
-interface IFFReport {
-  timestamp: number;
-  overall_iff_score: number;
-  system_trustworthiness: "high" | "medium" | "low" | "critical";
-  dynamic_fidelity: {
-    dynamic_fidelity_index: number;
-    status: "excellent" | "good" | "acceptable" | "poor" | "critical";
-  };
-  uncertainty_analysis: {
-    overall_uncertainty_percent: number;
-    confidence_level: number;
-  };
-  agentic_decision: {
-    action: string;
-  };
+  return reports;
 }
 
 export default function IFFAnalytics() {
   const [reports, setReports] = useState<IFFReport[]>([]);
-  const [trend, setTrend] = useState<{ trend: "improving" | "stable" | "degrading"; rate: number }>({
-    trend: "stable",
-    rate: 0,
-  });
-  const [scientificReport, setScientificReport] = useState<any>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState<"1h" | "24h" | "7d" | "all">("1h");
+  const [useDemoData, setUseDemoData] = useState(true);
 
-  // Usar dados de demonstração
+  // Fetch real data from database
+  const { data: historyData, isLoading } = trpc.iff.getHistory.useQuery({ limit: 100 });
+  const { data: statsData } = trpc.iff.getStatistics.useQuery({});
+
   useEffect(() => {
-    // Gerar dados de demonstração
-    const demoData = generateDemoData();
-    setReports(demoData.reports);
-  }, []);
+    // Use real data if available, otherwise use demo data
+    if (historyData && historyData.length > 0) {
+      const mappedData = historyData.map((test: any) => ({
+        timestamp: test.createdAt?.getTime?.() || Date.now(),
+        overall_iff_score: test.overallIFFScore || 0.75,
+        system_trustworthiness: (test.systemTrustworthiness as "high" | "medium" | "low") || "medium",
+        agentic_decision: {
+          action: (test.agenticDecision as "ALLOW" | "BLOCK") || "ALLOW",
+        },
+      }));
+      setReports(mappedData);
+      setUseDemoData(false);
+    } else if (!isLoading) {
+      // Use demo data if no real data available
+      setReports(generateDemoData());
+      setUseDemoData(true);
+    }
+  }, [historyData, isLoading]);
 
-
-
-  // Preparar dados para gráficos
+  // Prepare chart data
   const chartData = reports
-    .slice(-100)
-    .map((r) => ({
-      timestamp: new Date(r.timestamp).toLocaleTimeString(),
-      iff_score: r.overall_iff_score,
-      dfi: r.dynamic_fidelity.dynamic_fidelity_index,
-      uncertainty: r.uncertainty_analysis.overall_uncertainty_percent,
-      confidence: r.uncertainty_analysis.confidence_level * 100,
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((report) => ({
+      time: new Date(report.timestamp).toLocaleTimeString(),
+      score: parseFloat((report.overall_iff_score * 100).toFixed(2)),
+      trustworthiness: report.system_trustworthiness === "high" ? 100 : report.system_trustworthiness === "medium" ? 50 : 0,
     }));
 
-  // Distribuição de decisões
-  const decisionDistribution = reports.reduce(
-    (acc, r) => {
-      const action = r.agentic_decision.action;
-      acc[action] = (acc[action] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  const decisionData = Object.entries(decisionDistribution).map(([name, value]) => ({
-    name,
-    value,
-    percentage: ((value / reports.length) * 100).toFixed(1),
-  }));
-
-  // Distribuição de confiabilidade
-  const trustDistribution = reports.reduce(
-    (acc, r) => {
-      const trust = r.system_trustworthiness;
-      acc[trust] = (acc[trust] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  const trustData = Object.entries(trustDistribution).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value,
-    percentage: ((value / reports.length) * 100).toFixed(1),
-  }));
-
-  // Heatmap de confiabilidade
-  const heatmapData = reports
-    .slice(-60)
-    .map((r) => ({
-      time: new Date(r.timestamp).toLocaleTimeString(),
-      score: r.overall_iff_score,
-      trust: r.system_trustworthiness,
-    }));
-
-  const getTrustColor = (trust: string) => {
-    switch (trust) {
-      case "high":
-        return "#10b981";
-      case "medium":
-        return "#f59e0b";
-      case "low":
-        return "#ef4444";
-      case "critical":
-        return "#7c3aed";
-      default:
-        return "#6b7280";
-    }
+  // Decision distribution
+  const decisionCounts = {
+    allow: reports.filter((r) => r.agentic_decision.action === "ALLOW").length,
+    block: reports.filter((r) => r.agentic_decision.action === "BLOCK").length,
   };
 
-  const getTrustBadgeColor = (trust: string) => {
-    switch (trust) {
-      case "high":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
-      case "medium":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-      case "low":
-        return "bg-red-500/20 text-red-400 border-red-500/30";
-      case "critical":
-        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
-      default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-    }
+  const decisionData = [
+    { name: "ALLOW", value: decisionCounts.allow, fill: "#22c55e" },
+    { name: "BLOCK", value: decisionCounts.block, fill: "#ef4444" },
+  ];
+
+  // Trustworthiness distribution
+  const trustCounts = {
+    high: reports.filter((r) => r.system_trustworthiness === "high").length,
+    medium: reports.filter((r) => r.system_trustworthiness === "medium").length,
+    low: reports.filter((r) => r.system_trustworthiness === "low").length,
   };
 
-  const avgIFFScore =
-    reports.length > 0 ? (reports.reduce((sum, r) => sum + r.overall_iff_score, 0) / reports.length).toFixed(2) : "0";
+  const trustData = [
+    { name: "High", value: trustCounts.high, fill: "#22c55e" },
+    { name: "Medium", value: trustCounts.medium, fill: "#eab308" },
+    { name: "Low", value: trustCounts.low, fill: "#ef4444" },
+  ];
 
-  const latestReport = reports[reports.length - 1];
+  // Statistics
+  const avgScore = reports.length > 0 ? (reports.reduce((sum, r) => sum + r.overall_iff_score, 0) / reports.length * 100).toFixed(2) : "0";
+  const highTrust = trustCounts.high;
+  const blockRate = ((decisionCounts.block / (decisionCounts.allow + decisionCounts.block)) * 100).toFixed(1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Dashboard IFF Analytics</h1>
-              <p className="text-slate-400">
-                Análise em tempo real do Índice de Fidelidade Física para Digital Twins HVDC
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {(["1h", "24h", "7d", "all"] as const).map((period) => (
-                <Button
-                  key={period}
-                  variant={selectedPeriod === period ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedPeriod(period)}
-                  className="border-slate-600"
-                >
-                  {period === "1h" ? "1h" : period === "24h" ? "24h" : period === "7d" ? "7d" : "Tudo"}
-                </Button>
-              ))}
-            </div>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">IFF Analytics Dashboard</h1>
+            <p className="text-slate-400">
+              {useDemoData ? "Demonstração com dados simulados" : "Dados em tempo real do banco de dados"}
+            </p>
           </div>
-
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                  <Zap className="w-4 h-4" />
-                  Score IFF Médio
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white">{avgIFFScore}</div>
-                <p className="text-xs text-slate-500 mt-1">últimas {reports.length} avaliações</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Tendência
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-white capitalize">{trend.trend}</div>
-                <p className="text-xs text-slate-500 mt-1">{trend.rate.toFixed(3)} pts/seg</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Confiabilidade Atual
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {latestReport && (
-                  <div>
-                    <Badge className={`${getTrustBadgeColor(latestReport.system_trustworthiness)} border`}>
-                      {latestReport.system_trustworthiness.toUpperCase()}
-                    </Badge>
-                    <p className="text-xs text-slate-500 mt-1">{latestReport.overall_iff_score.toFixed(1)}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                  <Activity className="w-4 h-4" />
-                  Decisão Atual
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {latestReport && (
-                  <div>
-                    <div className="text-3xl font-bold text-white">{latestReport.agentic_decision.action}</div>
-                    <p className="text-xs text-slate-500 mt-1">ação agêntica</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {useDemoData && (
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30">
+              Demo Mode
+            </Badge>
+          )}
         </div>
 
-        {/* Gráficos Principais */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Tendência de Score IFF */}
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="bg-slate-800/50 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">Tendência de Score IFF</CardTitle>
-              <CardDescription>Evolução do índice de fidelidade ao longo do tempo</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Avg IFF Score
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorIFF" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                  <XAxis dataKey="timestamp" stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #475569",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#e2e8f0" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="iff_score"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#colorIFF)"
-                    name="IFF Score"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="text-3xl font-bold text-cyan-400">{avgScore}%</div>
             </CardContent>
           </Card>
 
-          {/* Fidelidade Dinâmica vs Incerteza */}
           <Card className="bg-slate-800/50 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white">Fidelidade Dinâmica vs Incerteza</CardTitle>
-              <CardDescription>Relação entre DFI e nível de incerteza</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                High Trustworthiness
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                  <XAxis dataKey="timestamp" stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #475569",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#e2e8f0" }}
-                  />
-                  <Legend wrapperStyle={{ color: "#e2e8f0" }} />
-                  <Line
-                    type="monotone"
-                    dataKey="dfi"
-                    stroke="#10b981"
-                    name="Fidelidade Dinâmica (%)"
-                    strokeWidth={2}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="uncertainty"
-                    stroke="#ef4444"
-                    name="Incerteza (%)"
-                    strokeWidth={2}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
+              <div className="text-3xl font-bold text-green-400">{highTrust}</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                Block Rate
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-400">{blockRate}%</div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                Total Tests
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-400">{reports.length}</div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Distribuições */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Distribuição de Decisões */}
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* IFF Score Trend */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white">Distribuição de Decisões Agênticas</CardTitle>
-              <CardDescription>Frequência de cada ação de decisão</CardDescription>
+              <CardTitle className="text-white">IFF Score Trend</CardTitle>
+              <CardDescription>Score over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="time" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
+                  <Legend />
+                  <Line type="monotone" dataKey="score" stroke="#06b6d4" dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Decision Distribution */}
+          <Card className="bg-slate-800/50 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white">Agentic Decisions</CardTitle>
+              <CardDescription>Distribution of ALLOW/BLOCK decisions</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={decisionData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                  <XAxis dataKey="name" stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #475569",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#e2e8f0" }}
-                    formatter={(value: any) => `${value} (${decisionData.find((d) => d.value === value)?.percentage}%)`}
-                  />
-                  <Bar dataKey="value" fill="#8b5cf6" name="Ocorrências" radius={[8, 8, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
+                  <Bar dataKey="value" fill="#06b6d4" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Distribuição de Confiabilidade */}
+          {/* Trustworthiness Distribution */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white">Distribuição de Confiabilidade</CardTitle>
-              <CardDescription>Classificação de confiabilidade do sistema</CardDescription>
+              <CardTitle className="text-white">System Trustworthiness</CardTitle>
+              <CardDescription>Distribution across levels</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={trustData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                  <XAxis dataKey="name" stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <YAxis stroke="#94a3b8" style={{ fontSize: "12px" }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #475569",
-                      borderRadius: "8px",
-                    }}
-                    labelStyle={{ color: "#e2e8f0" }}
-                    formatter={(value: any) => `${value} (${trustData.find((d) => d.value === value)?.percentage}%)`}
-                  />
-                  <Bar dataKey="value" fill="#06b6d4" name="Ocorrências" radius={[8, 8, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
+                  <Bar dataKey="value" fill="#06b6d4" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Heatmap de Confiabilidade */}
-        <Card className="bg-slate-800/50 border-slate-700 mb-6">
-          <CardHeader>
-            <CardTitle className="text-white">Heatmap de Confiabilidade Temporal</CardTitle>
-            <CardDescription>Visualização temporal do nível de confiabilidade</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {heatmapData.map((data, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <div className="w-24 text-xs text-slate-400">{data.time}</div>
-                  <div className="flex-1 h-8 bg-slate-700 rounded flex items-center px-2 relative overflow-hidden">
-                    <div
-                      className="h-full rounded absolute left-0 top-0"
-                      style={{
-                        width: `${data.score}%`,
-                        backgroundColor: getTrustColor(data.trust),
-                        opacity: 0.7,
-                      }}
-                    />
-                    <span className="text-xs text-white font-semibold relative z-10">{data.score.toFixed(1)}</span>
-                  </div>
-                  <Badge className={`${getTrustBadgeColor(data.trust)} border text-xs`}>
-                    {data.trust.toUpperCase()}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Relatório Científico */}
-        {scientificReport && (
+          {/* Statistics */}
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <AlertCircle className="w-5 h-5" />
-                Relatório Científico
-              </CardTitle>
-              <CardDescription>Sumário para publicação acadêmica</CardDescription>
+              <CardTitle className="text-white">Test Statistics</CardTitle>
+              <CardDescription>Summary of test results</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-300 mb-3">Framework</h3>
-                  <p className="text-white font-bold mb-2">{scientificReport.framework_name}</p>
-                  <div className="space-y-2 text-sm text-slate-400">
-                    {Object.entries(scientificReport.dimensions).map(([key, value]: [string, any]) => (
-                      <div key={key}>
-                        <span className="font-semibold text-slate-300">{key}:</span> {value}
-                      </div>
-                    ))}
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Total Tests:</span>
+                  <span className="text-white font-semibold">{reports.length}</span>
                 </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-300 mb-3">Estatísticas</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-xs text-slate-500">Avaliações Realizadas</p>
-                      <p className="text-2xl font-bold text-white">{scientificReport.evaluation_count}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Score IFF Médio</p>
-                      <p className="text-2xl font-bold text-white">{scientificReport.average_iff_score}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Tendência</p>
-                      <p className="text-sm text-slate-300">{scientificReport.trend}</p>
-                    </div>
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Avg Score:</span>
+                  <span className="text-cyan-400 font-semibold">{avgScore}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">High Trust:</span>
+                  <span className="text-green-400 font-semibold">{highTrust}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Block Rate:</span>
+                  <span className="text-red-400 font-semibold">{blockRate}%</span>
                 </div>
               </div>
             </CardContent>
           </Card>
-        )}
+        </div>
       </div>
     </div>
   );

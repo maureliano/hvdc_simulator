@@ -103,9 +103,9 @@
 
 
 ## Persistência de Dados IFF no SQLite
-- [ ] Criar schema do banco para testes IFF
-- [ ] Implementar funções de salvamento de testes
-- [ ] Implementar funções de recuperação de histórico
-- [ ] Adicionar endpoints tRPC para gerenciar testes
-- [ ] Atualizar dashboard para usar dados persistidos
-- [ ] Testar integração completa
+- [x] Criar schema do banco para testes IFF
+- [x] Implementar funções de salvamento de testes
+- [x] Implementar funções de recuperação de histórico
+- [x] Adicionar endpoints tRPC para gerenciar testes
+- [x] Atualizar dashboard para usar dados persistidos
+- [x] Testar integração completa
