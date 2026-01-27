@@ -14,6 +14,7 @@ import {
 } from "./db";
 import { spawn } from "child_process";
 import path from "path";
+import { iffRouter } from "./iff/iff-router";
 
 // Helper function to run Python simulation
 function runPythonSimulation(params: any): Promise<any> {
@@ -186,6 +187,7 @@ export const appRouter = router({
         return [];
       }),
   }),
+  iff: iffRouter,
 });
 
 export type AppRouter = typeof appRouter;

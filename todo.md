@@ -74,3 +74,13 @@
 - [x] Corrigir spawn python3.11 ENOENT (usar python3)
 - [x] Remover warnings de OAuth
 - [ ] Testar container corrigido
+
+
+## Framework IFF - Índice de Fidelidade Física
+- [ ] Implementar Dimensão 1: Métrica de Fidelidade Dinâmica
+- [ ] Implementar Dimensão 2: Análise de Incertezas em Tempo Real
+- [ ] Implementar Dimensão 3: Validação com Hardware-in-the-Loop
+- [ ] Implementar Dimensão 4: Decisão Agêntica com Bloqueio Automático
+- [ ] Criar dashboard de visualização do IFF
+- [ ] Criar documentação acadêmica e API reference
+- [ ] Gerar dados para artigo científico
