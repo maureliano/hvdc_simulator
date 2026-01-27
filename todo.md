@@ -100,3 +100,12 @@
 - [x] Criar API para recuperar histórico de testes
 - [x] Corrigir dashboard para carregar e exibir dados
 - [x] Testar integração entre testes e analytics
+
+
+## Persistência de Dados IFF no SQLite
+- [ ] Criar schema do banco para testes IFF
+- [ ] Implementar funções de salvamento de testes
+- [ ] Implementar funções de recuperação de histórico
+- [ ] Adicionar endpoints tRPC para gerenciar testes
+- [ ] Atualizar dashboard para usar dados persistidos
+- [ ] Testar integração completa

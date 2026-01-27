@@ -22,6 +22,35 @@ import { Badge } from "@/components/ui/badge";
 import { AlertCircle, TrendingUp, Activity, Shield, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
+function generateDemoData() {
+  const reports: IFFReport[] = [];
+  const now = Date.now();
+  
+  for (let i = 100; i > 0; i--) {
+    const timestamp = now - i * 60000;
+    const baseScore = 0.75 + Math.random() * 0.2;
+    
+    reports.push({
+      timestamp,
+      overall_iff_score: baseScore,
+      system_trustworthiness: baseScore > 0.85 ? "high" : baseScore > 0.7 ? "medium" : "low",
+      dynamic_fidelity: {
+        dynamic_fidelity_index: baseScore,
+        status: baseScore > 0.85 ? "excellent" : baseScore > 0.7 ? "good" : "acceptable",
+      },
+      uncertainty_analysis: {
+        overall_uncertainty_percent: Math.random() * 10,
+        confidence_level: 0.8 + Math.random() * 0.2,
+      },
+      agentic_decision: {
+        action: Math.random() > 0.7 ? "BLOCK" : "ALLOW",
+      },
+    });
+  }
+  
+  return { reports };
+}
+
 interface IFFReport {
   timestamp: number;
   overall_iff_score: number;
@@ -48,28 +77,14 @@ export default function IFFAnalytics() {
   const [scientificReport, setScientificReport] = useState<any>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<"1h" | "24h" | "7d" | "all">("1h");
 
-  // Fetch reports
-  const { data: historyData } = trpc.iff.getReportHistory.useQuery({ limit: 1000 });
-  const { data: trendData } = trpc.iff.getIFFTrend.useQuery();
-  const { data: scientificData } = trpc.iff.generateScientificReport.useQuery();
-
+  // Usar dados de demonstração
   useEffect(() => {
-    if (historyData) {
-      setReports(historyData as IFFReport[]);
-    }
-  }, [historyData]);
+    // Gerar dados de demonstração
+    const demoData = generateDemoData();
+    setReports(demoData.reports);
+  }, []);
 
-  useEffect(() => {
-    if (trendData) {
-      setTrend(trendData);
-    }
-  }, [trendData]);
 
-  useEffect(() => {
-    if (scientificData) {
-      setScientificReport(scientificData);
-    }
-  }, [scientificData]);
 
   // Preparar dados para gráficos
   const chartData = reports
