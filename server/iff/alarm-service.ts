@@ -1,6 +1,6 @@
 import { getDb } from "../db";
 import { iffAlarmThresholds, iffAlarmEvents, iffTestResults } from "../../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lte } from "drizzle-orm";
 
 const getDatabase = async () => {
   const db = await getDb();
@@ -470,5 +470,105 @@ export async function getAlarmStatistics(userId?: number) {
       totalHistorical: 0,
       alarmsByMetric: {},
     };
+  }
+}
+
+
+/**
+ * Buscar histórico de alarmes com filtros avançados
+ */
+export async function getAlarmHistoryWithFilters(
+  userId: number | undefined,
+  filters: {
+    startDate?: Date;
+    endDate?: Date;
+    severity?: "WARNING" | "CRITICAL";
+    metricName?: string;
+    status?: "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED";
+  },
+  limit: number = 100,
+  offset: number = 0
+): Promise<{ events: AlarmEvent[]; total: number }> {
+  try {
+    const db = await getDatabase();
+    const whereConditions: any[] = [];
+
+    if (userId) {
+      whereConditions.push(eq(iffAlarmEvents.userId, userId));
+    }
+
+    if (filters.severity) {
+      whereConditions.push(eq(iffAlarmEvents.severity, filters.severity));
+    }
+
+    if (filters.metricName) {
+      whereConditions.push(eq(iffAlarmEvents.metricName, filters.metricName));
+    }
+
+    if (filters.status) {
+      whereConditions.push(eq(iffAlarmEvents.status, filters.status));
+    }
+
+    if (filters.startDate) {
+      whereConditions.push(
+        gte(iffAlarmEvents.createdAt, filters.startDate)
+      );
+    }
+
+    if (filters.endDate) {
+      whereConditions.push(
+        lte(iffAlarmEvents.createdAt, filters.endDate)
+      );
+    }
+
+    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    const events = await db
+      .select()
+      .from(iffAlarmEvents)
+      .where(whereClause)
+      .orderBy(iffAlarmEvents.createdAt)
+      .limit(limit)
+      .offset(offset);
+
+    // Contar total sem limit/offset
+    const countResult = await db
+      .select()
+      .from(iffAlarmEvents)
+      .where(whereClause);
+
+    return {
+      events,
+      total: countResult.length,
+    };
+  } catch (error) {
+    console.error("[Alarm Service] Error fetching filtered alarm history:", error);
+    return { events: [], total: 0 };
+  }
+}
+
+/**
+ * Obter métricas únicas de alarmes para filtro
+ */
+export async function getAlarmMetrics(userId?: number): Promise<string[]> {
+  try {
+    const db = await getDatabase();
+    const query = userId
+      ? await db
+          .select({ metricName: iffAlarmEvents.metricName })
+          .from(iffAlarmEvents)
+          .where(eq(iffAlarmEvents.userId, userId))
+          .distinct()
+      : await db
+          .select({ metricName: iffAlarmEvents.metricName })
+          .from(iffAlarmEvents)
+          .distinct();
+
+    return query
+      .map((r: any) => r.metricName)
+      .filter((m: string) => m !== null && m !== undefined);
+  } catch (error) {
+    console.error("[Alarm Service] Error fetching alarm metrics:", error);
+    return [];
   }
 }

@@ -121,3 +121,10 @@
 - [x] Corrigir rota tRPC simulation.run que estava faltando
 - [x] Remover demo mode do IFF Analytics e adicionar empty state
 - [x] Corrigir todos os erros de TypeScript (16 erros resolvidos)
+
+## Dashboard de Histórico de Alarmes
+- [x] Adicionar endpoints tRPC para buscar histórico com filtros (data, severidade, métrica)
+- [x] Criar página AlarmHistory com componentes de filtro
+- [x] Implementar visualizações (gráficos de tendências e tabela de eventos)
+- [x] Integrar página ao dashboard e navegação
+- [x] Adicionar testes para endpoints de histórico

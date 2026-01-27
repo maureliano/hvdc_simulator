@@ -78,6 +78,12 @@ export default function Home() {
                   Testes
                 </Button>
               </Link>
+              <Link href="/alarm-history">
+                <Button variant="outline" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Alarmes
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

@@ -32,7 +32,9 @@ import {
   acknowledgeAlarmEvent,
   resolveAlarmEvent,
   checkIFFTestResultForAlarms,
-  getAlarmStatistics
+  getAlarmStatistics,
+  getAlarmHistoryWithFilters,
+  getAlarmMetrics
 } from "./iff/alarm-service";
 import { spawn } from "child_process";
 import path from "path";
@@ -416,7 +418,38 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await getAlarmStatistics(input.userId);
       }),
-  }),
+
+
+    // Get alarm history with filters
+    getHistoryWithFilters: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        startDate: z.date().optional(),
+        endDate: z.date().optional(),
+        severity: z.enum(["WARNING", "CRITICAL"]).optional(),
+        metricName: z.string().optional(),
+        status: z.enum(["ACTIVE", "ACKNOWLEDGED", "RESOLVED"]).optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        const { userId, limit, offset, ...filters } = input;
+        return await getAlarmHistoryWithFilters(
+          userId,
+          filters,
+          limit || 100,
+          offset || 0
+        );
+      }),
+
+    // Get available metrics for filtering
+    getMetrics: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmMetrics(input.userId);
+      }),  }),
 });
 
 export type AppRouter = typeof appRouter;
