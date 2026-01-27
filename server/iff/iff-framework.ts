@@ -15,6 +15,7 @@ import AgenticDecisionMaker, {
   DecisionContext,
   AgenticDecision,
 } from "./agentic-decision";
+import { generateDemoData } from "./demo-data";
 
 export interface IFFFrameworkReport {
   timestamp: number;
@@ -251,6 +252,10 @@ export class IFFFramework {
    * Retorna histórico de relatórios
    */
   getReportHistory(limit: number = 100): IFFFrameworkReport[] {
+    // Se não há histórico, gera dados de demonstração
+    if (this.reportHistory.length === 0) {
+      return generateDemoData(limit);
+    }
     return this.reportHistory.slice(-limit);
   }
 
