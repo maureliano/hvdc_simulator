@@ -59,12 +59,26 @@ export default function Home() {
                 <p className="text-sm text-slate-400">Sistema de Transmissão em Corrente Contínua de Alta Tensão</p>
               </div>
             </div>
-            <Link href="/supervisory">
-              <Button variant="default" className="gap-2">
-                <Activity className="h-4 w-4" />
-                Dashboard Supervisório
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href="/supervisory">
+                <Button variant="default" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Supervisório
+                </Button>
+              </Link>
+              <Link href="/iff-analytics">
+                <Button variant="outline" className="gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  IFF Analytics
+                </Button>
+              </Link>
+              <Link href="/iff-test-scenarios">
+                <Button variant="outline" className="gap-2">
+                  <Gauge className="h-4 w-4" />
+                  Testes
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </header>
