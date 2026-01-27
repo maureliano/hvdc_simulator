@@ -120,3 +120,4 @@
 - [x] Atualizar documentação com guia de alarmes
 - [x] Corrigir rota tRPC simulation.run que estava faltando
 - [x] Remover demo mode do IFF Analytics e adicionar empty state
+- [x] Corrigir todos os erros de TypeScript (16 erros resolvidos)

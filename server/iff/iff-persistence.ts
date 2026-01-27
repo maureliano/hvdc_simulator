@@ -314,17 +314,17 @@ export class IFFPersistence {
         };
       }
 
-      const scores = results.map((r) => r.overallIFFScore).filter((s) => s !== null) as number[];
-      const trustworthiness = results.map((r) => r.systemTrustworthiness);
-      const decisions = results.map((r) => r.agenticDecision);
+      const scores = results.map((r: any) => r.overallIFFScore).filter((s: any) => s !== null) as number[];
+      const trustworthiness = results.map((r: any) => r.systemTrustworthiness);
+      const decisions = results.map((r: any) => r.agenticDecision);
 
       const trustworthinessDistribution: Record<string, number> = {};
-      trustworthiness.forEach((t) => {
+      trustworthiness.forEach((t: any) => {
         trustworthinessDistribution[t] = (trustworthinessDistribution[t] || 0) + 1;
       });
 
       const decisionDistribution: Record<string, number> = {};
-      decisions.forEach((d) => {
+      decisions.forEach((d: any) => {
         decisionDistribution[d] = (decisionDistribution[d] || 0) + 1;
       });
 

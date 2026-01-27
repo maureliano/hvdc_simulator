@@ -1,10 +1,10 @@
-import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { InsertUser, users, circuitConfigs, simulationResults, InsertCircuitConfig, InsertSimulationResult } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { desc, eq } from "drizzle-orm";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+let _db: any = null;
 let _connection: mysql.Connection | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
@@ -120,8 +120,10 @@ export async function createCircuitConfig(config: InsertCircuitConfig) {
     throw new Error("Database not available");
   }
 
-  const result = await db.insert(circuitConfigs).values(config).returning();
-  return result[0];
+  await db.insert(circuitConfigs).values(config);
+  // MySQL não suporta returning, buscar o último registro inserido
+  const inserted = await db.select().from(circuitConfigs).orderBy(desc(circuitConfigs.id)).limit(1);
+  return inserted[0];
 }
 
 export async function getCircuitConfigsByUserId(userId: number) {
@@ -162,7 +164,9 @@ export async function saveSimulationResult(result: InsertSimulationResult) {
     throw new Error("Database not available");
   }
 
-  const inserted = await db.insert(simulationResults).values(result).returning();
+  await db.insert(simulationResults).values(result);
+  // MySQL não suporta returning, buscar o último registro inserido
+  const inserted = await db.select().from(simulationResults).orderBy(desc(simulationResults.id)).limit(1);
   return inserted[0];
 }
 

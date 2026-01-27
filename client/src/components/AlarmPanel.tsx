@@ -13,8 +13,15 @@ interface AlarmEvent {
   status: "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED";
   message: string;
   createdAt: Date;
-  acknowledgedAt?: Date;
-  resolvedAt?: Date;
+  acknowledgedAt: Date | null;
+  resolvedAt: Date | null;
+  userId: number | null;
+  testResultId: number | null;
+  thresholdId: number | null;
+  acknowledgedBy: string | null;
+  resolvedBy: string | null;
+  resolutionNotes: string | null;
+  updatedAt: Date;
 }
 
 interface AlarmThreshold {
@@ -23,7 +30,10 @@ interface AlarmThreshold {
   criticalThreshold: number;
   warningThreshold: number;
   enabled: boolean;
-  description?: string;
+  description: string | null;
+  userId: number | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export function AlarmPanel() {

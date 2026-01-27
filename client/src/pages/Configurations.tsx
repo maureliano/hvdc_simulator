@@ -38,7 +38,7 @@ export default function Configurations() {
         loadMw: 1000.0,
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao criar configuração: ${error.message}`);
     },
   });
@@ -48,7 +48,7 @@ export default function Configurations() {
       toast.success("Configuração excluída!");
       refetch();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error(`Erro ao excluir: ${error.message}`);
     },
   });
@@ -163,7 +163,7 @@ export default function Configurations() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {configs?.map((config) => (
+          {configs?.map((config: any) => (
             <Card key={config.id} className="bg-gradient-to-br from-card to-card/50 hover:border-primary/50 transition-colors">
               <CardHeader>
                 <CardTitle className="text-lg">{config.name}</CardTitle>

@@ -97,6 +97,48 @@ export const appRouter = router({
     }),
   }),
 
+  // Configuration router
+  config: router({
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        ac1Voltage: z.number(),
+        ac2Voltage: z.number(),
+        dcVoltage: z.number(),
+        powerMva: z.number(),
+        loadMw: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ctx.user) return null;
+        return await createCircuitConfig({
+          userId: ctx.user.id,
+          name: input.name,
+          description: input.description,
+          ac1Voltage: input.ac1Voltage,
+          ac2Voltage: input.ac2Voltage,
+          dcVoltage: input.dcVoltage,
+          powerMva: input.powerMva,
+          loadMw: input.loadMw,
+        });
+      }),
+    list: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) return [];
+        return await getCircuitConfigsByUserId(ctx.user.id);
+      }),
+    get: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await getCircuitConfigById(input.id);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        return await deleteCircuitConfig(input.id);
+      }),
+  }),
+
   // Circuit simulation router
   circuit: router({
     // Run simulation

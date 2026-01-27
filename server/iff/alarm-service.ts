@@ -15,12 +15,14 @@ const getDatabase = async () => {
 
 export interface AlarmThreshold {
   id: number;
-  userId?: number;
+  userId: number | null;
   metricName: string;
   criticalThreshold: number;
   warningThreshold: number;
   enabled: boolean;
-  description?: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface AlarmEvent {
@@ -65,8 +67,15 @@ export async function getAlarmThresholds(userId?: number): Promise<AlarmThreshol
           .where(eq(iffAlarmThresholds.enabled, 1));
 
     return query.map((t: any) => ({
-      ...t,
+      id: t.id,
+      userId: t.userId,
+      metricName: t.metricName,
+      criticalThreshold: t.criticalThreshold,
+      warningThreshold: t.warningThreshold,
       enabled: t.enabled === 1,
+      description: t.description,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
     }));
   } catch (error) {
     console.error("[Alarm Service] Error fetching thresholds:", error);
@@ -103,9 +112,17 @@ export async function createAlarmThreshold(
 
     if (created.length === 0) return null;
 
+    const threshold = created[0] as any;
     return {
-      ...created[0],
-      enabled: (created[0] as any).enabled === 1,
+      id: threshold.id,
+      userId: threshold.userId,
+      metricName: threshold.metricName,
+      criticalThreshold: threshold.criticalThreshold,
+      warningThreshold: threshold.warningThreshold,
+      enabled: threshold.enabled === 1,
+      description: threshold.description,
+      createdAt: threshold.createdAt,
+      updatedAt: threshold.updatedAt,
     };
   } catch (error) {
     console.error("[Alarm Service] Error creating threshold:", error);

@@ -157,11 +157,11 @@ export async function getIFFTestStatistics(
 
     const totalTests = allResults.length;
     const averageIFFScore = totalTests > 0 
-      ? allResults.reduce((sum, r) => sum + (r.overallIFFScore || 0), 0) / totalTests
+      ? allResults.reduce((sum: number, r: any) => sum + (r.overallIFFScore || 0), 0) / totalTests
       : 0;
 
-    const highTrustworthiness = allResults.filter(r => r.systemTrustworthiness === "high").length;
-    const blockedDecisions = allResults.filter(r => r.agenticDecision === "BLOCK").length;
+    const highTrustworthiness = allResults.filter((r: any) => r.systemTrustworthiness === "high").length;
+    const blockedDecisions = allResults.filter((r: any) => r.agenticDecision === "BLOCK").length;
 
     // Contar eventos críticos
     const allEvents = await db
@@ -240,7 +240,7 @@ export async function getIFFTrend(
 
     const data = results
       .reverse()
-      .map(r => ({
+      .map((r: any) => ({
         timestamp: r.createdAt?.getTime() || 0,
         score: r.overallIFFScore || 0,
       }));
@@ -249,8 +249,8 @@ export async function getIFFTrend(
     const firstHalf = data.slice(0, Math.floor(data.length / 2));
     const secondHalf = data.slice(Math.floor(data.length / 2));
 
-    const avgFirst = firstHalf.reduce((sum, d) => sum + d.score, 0) / firstHalf.length;
-    const avgSecond = secondHalf.reduce((sum, d) => sum + d.score, 0) / secondHalf.length;
+    const avgFirst = firstHalf.reduce((sum: number, d: any) => sum + d.score, 0) / firstHalf.length;
+    const avgSecond = secondHalf.reduce((sum: number, d: any) => sum + d.score, 0) / secondHalf.length;
 
     const rate = avgSecond - avgFirst;
     let trend: "improving" | "stable" | "degrading" = "stable";
