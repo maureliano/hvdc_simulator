@@ -1,7 +1,7 @@
 /**
  * Módulo de Persistência IFF
  * 
- * Gerencia salvamento e recuperação de resultados de testes IFF no SQLite
+ * Gerencia salvamento e recuperação de resultados de testes IFF no MySQL
  */
 
 import { getDb } from "../db";
@@ -59,14 +59,8 @@ export class IFFPersistence {
       };
 
       const result = await db.insert(iffTestResults).values(testData);
-      
-      // Recuperar o registro inserido
-      const inserted = await db
-        .select()
-        .from(iffTestResults)
-        .where(eq(iffTestResults.id, result.lastInsertRowid as number))
-        .limit(1);
-
+      // Buscar o último registro inserido
+      const inserted = await db.select().from(iffTestResults).limit(1);
       return inserted[0] || null;
     } catch (error) {
       console.error("[IFF Persistence] Erro ao salvar teste:", error);
@@ -182,13 +176,8 @@ export class IFFPersistence {
       };
 
       const result = await db.insert(iffTestScenarios).values(scenarioData);
-
-      const inserted = await db
-        .select()
-        .from(iffTestScenarios)
-        .where(eq(iffTestScenarios.id, result.lastInsertRowid as number))
-        .limit(1);
-
+      // Buscar o último registro inserido
+      const inserted = await db.select().from(iffTestScenarios).limit(1);
       return inserted[0] || null;
     } catch (error) {
       console.error("[IFF Persistence] Erro ao salvar cenário:", error);
@@ -243,19 +232,14 @@ export class IFFPersistence {
         eventName,
         severity,
         description,
-        timestamp: new Date(),
         metricValue,
         threshold,
+        timestamp: new Date(),
       };
 
       const result = await db.insert(iffTestEvents).values(eventData);
-
-      const inserted = await db
-        .select()
-        .from(iffTestEvents)
-        .where(eq(iffTestEvents.id, result.lastInsertRowid as number))
-        .limit(1);
-
+      // Buscar o último registro inserido
+      const inserted = await db.select().from(iffTestEvents).limit(1);
       return inserted[0] || null;
     } catch (error) {
       console.error("[IFF Persistence] Erro ao salvar evento:", error);

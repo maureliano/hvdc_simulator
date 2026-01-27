@@ -119,3 +119,4 @@
 - [x] Adicionar testes vitest para sistema de alarmes
 - [x] Atualizar documentação com guia de alarmes
 - [x] Corrigir rota tRPC simulation.run que estava faltando
+- [x] Remover demo mode do IFF Analytics e adicionar empty state

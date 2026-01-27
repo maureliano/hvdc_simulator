@@ -1,28 +1,36 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { InsertUser, users, circuitConfigs, simulationResults, InsertCircuitConfig, InsertSimulationResult } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
-let _sqlite: Database.Database | null = null;
+let _connection: mysql.Connection | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // Extrair caminho do arquivo SQLite da URL
-      const dbPath = process.env.DATABASE_URL.replace("file:", "");
+      // Parse MySQL connection string
+      const url = new URL(process.env.DATABASE_URL);
       
-      // Criar conexão SQLite
-      _sqlite = new Database(dbPath);
-      _db = drizzle(_sqlite);
+      // Create connection
+      _connection = await mysql.createConnection({
+        host: url.hostname,
+        port: url.port ? parseInt(url.port) : 3306,
+        user: url.username,
+        password: url.password,
+        database: url.pathname.slice(1),
+        ssl: {},
+      });
       
-      console.log(`[Database] Connected to SQLite: ${dbPath}`);
+      _db = drizzle(_connection);
+      
+      console.log(`[Database] Connected to MySQL: ${url.hostname}`);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
-      _sqlite = null;
+      _connection = null;
     }
   }
   return _db;
@@ -69,7 +77,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = new Date();
     }
 
-    // SQLite: usar INSERT OR REPLACE
+    // MySQL: usar INSERT ... ON DUPLICATE KEY UPDATE
     const existing = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1);
     
     if (existing.length > 0) {
