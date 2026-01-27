@@ -118,3 +118,4 @@
 - [x] Criar componente UI de painel de alarmes no dashboard
 - [x] Adicionar testes vitest para sistema de alarmes
 - [x] Atualizar documentação com guia de alarmes
+- [x] Corrigir rota tRPC simulation.run que estava faltando

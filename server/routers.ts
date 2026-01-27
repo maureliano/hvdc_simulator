@@ -228,6 +228,39 @@ export const appRouter = router({
       }),
   }),
 
+  // Simulation router (legacy compatibility)
+  simulation: router({
+    run: publicProcedure
+      .input(z.object({
+        ac1_voltage: z.number().optional(),
+        ac2_voltage: z.number().optional(),
+        dc_voltage: z.number().optional(),
+        power_mva: z.number().optional(),
+        load_mw: z.number().optional(),
+        saveResult: z.boolean().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          const result = await runPythonSimulation({
+            ac1Voltage: input.ac1_voltage,
+            ac2Voltage: input.ac2_voltage,
+            dcVoltage: input.dc_voltage,
+            loadMw: input.load_mw,
+          });
+          return {
+            success: true,
+            data: result,
+          };
+        } catch (error) {
+          console.error("[Simulation] Error:", error);
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+          };
+        }
+      }),
+  }),
+
   // Alarm management router
   alarms: router({
     // Get configured thresholds
