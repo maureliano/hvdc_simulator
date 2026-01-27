@@ -69,3 +69,8 @@
 - [x] Implementar gráficos de tendência temporal
 - [x] Criar indicadores visuais de status (LEDs, gauges)
 - [x] Testar sistema completo
+
+## Correção - Erros Docker
+- [x] Corrigir spawn python3.11 ENOENT (usar python3)
+- [x] Remover warnings de OAuth
+- [ ] Testar container corrigido

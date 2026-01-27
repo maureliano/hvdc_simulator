@@ -125,7 +125,7 @@ export class MonitoringService {
   private async runSimulation(params: typeof this.simulationParams): Promise<MonitoringData> {
     return new Promise((resolve, reject) => {
       const scriptPath = path.join(process.cwd(), "server", "hvdc_simulator.py");
-      const pythonProcess = spawn("python3.11", [
+      const pythonProcess = spawn("python3", [
         scriptPath,
         params.acVoltage1.toString(),
         params.acVoltage2.toString(),
@@ -144,18 +144,31 @@ export class MonitoringService {
         stderr += data.toString();
       });
 
+      pythonProcess.on("error", (err) => {
+        reject(new Error(`Failed to spawn Python process: ${err.message}`));
+      });
+
       pythonProcess.on("close", (code) => {
         if (code !== 0) {
           reject(new Error(`Python script failed: ${stderr}`));
           return;
         }
 
+        if (!stdout || stdout.trim().length === 0) {
+          reject(new Error("Python script returned empty output"));
+          return;
+        }
+
         try {
           const result = JSON.parse(stdout);
+          if (!result || typeof result !== "object") {
+            reject(new Error("Invalid simulation result format"));
+            return;
+          }
           const monitoringData = this.transformToMonitoringData(result, params);
           resolve(monitoringData);
         } catch (error) {
-          reject(new Error(`Failed to parse simulation result: ${error}`));
+          reject(new Error(`Failed to parse simulation result: ${error}. Output: ${stdout.substring(0, 200)}`));
         }
       });
 
