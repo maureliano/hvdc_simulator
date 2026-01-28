@@ -138,3 +138,35 @@
 - [x] Adicionar análise de frequência de alarmes por métrica
 - [x] Integrar página ao dashboard e navegação
 - [x] Adicionar testes para endpoints de tendências
+
+
+## Adaptação para Pesquisa de Doutorado - Digital Twin Confiável
+### Critério 1: Métrica de Fidelidade (IFF)
+- [x] Documentar matematicamente o Índice de Fidelidade Física (IFF)
+- [x] Criar visualização das 4 dimensões do IFF
+- [x] Implementar dashboard de monitoramento de fidelidade em tempo real
+- [x] Gerar dados de validação de fidelidade
+
+### Critério 2: Análise de Incertezas
+- [x] Implementar cálculo de incerteza de medição (tolerâncias de sensores)
+- [x] Implementar cálculo de latência de comunicação
+- [x] Criar visualização de propagação de incertezas
+- [x] Gerar dados de análise de incertezas
+
+### Critério 3: Validação HIL (Hardware-in-the-Loop)
+- [x] Documentar arquitetura de co-simulação
+- [x] Implementar interface de simulação em tempo real
+- [x] Criar métricas de sincronização HIL
+- [x] Gerar dados de validação HIL
+
+### Critério 4: Decisão Agêntica
+- [x] Documentar lógica de decisão automática
+- [x] Implementar bloqueio automático quando IFF < threshold
+- [x] Criar histórico de decisões tomadas
+- [x] Gerar dados de decisões agênticas
+
+### Documentação Acadêmica
+- [x] Criar RESEARCH_FRAMEWORK.md com descrição completa do IFF
+- [x] Criar página ResearchResults com visualização dos 4 critérios
+- [x] Escrever seção de Metodologia para artigo
+- [x] Escrever seção de Resultados Experimentais

@@ -10,6 +10,7 @@ import IFFTestScenarios from "./pages/IFFTestScenarios";
 import Supervisory from "./pages/Supervisory";
 import { AlarmHistory } from "./pages/AlarmHistory";
 import TrendAnalysis from "./pages/TrendAnalysis";
+import { ResearchResults } from "./pages/ResearchResults";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/supervisory" component={Supervisory} />
       <Route path="/alarm-history" component={AlarmHistory} />
       <Route path="/trend-analysis" component={TrendAnalysis} />
+      <Route path="/research-results" component={ResearchResults} />
       <Route path="/404" component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
