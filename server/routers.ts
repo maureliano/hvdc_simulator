@@ -34,7 +34,11 @@ import {
   checkIFFTestResultForAlarms,
   getAlarmStatistics,
   getAlarmHistoryWithFilters,
-  getAlarmMetrics
+  getAlarmMetrics,
+  getAlarmTrendAnalysis,
+  getAlarmCorrelationAnalysis,
+  getAlarmHeatmapData,
+  getAlarmResolutionStats
 } from "./iff/alarm-service";
 import { spawn } from "child_process";
 import path from "path";
@@ -449,7 +453,48 @@ export const appRouter = router({
       }))
       .query(async ({ input }) => {
         return await getAlarmMetrics(input.userId);
-      }),  }),
+      }),
+
+    // Get alarm trend analysis
+    getTrendAnalysis: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        daysBack: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmTrendAnalysis(input.userId, input.daysBack);
+      }),
+
+    // Get alarm correlation analysis
+    getCorrelationAnalysis: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        daysBack: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmCorrelationAnalysis(input.userId, input.daysBack);
+      }),
+
+    // Get alarm heatmap data
+    getHeatmapData: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        daysBack: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmHeatmapData(input.userId, input.daysBack);
+      }),
+
+    // Get alarm resolution statistics
+    getResolutionStats: publicProcedure
+      .input(z.object({
+        userId: z.number().optional(),
+        daysBack: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await getAlarmResolutionStats(input.userId, input.daysBack);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

@@ -128,3 +128,13 @@
 - [x] Implementar visualizações (gráficos de tendências e tabela de eventos)
 - [x] Integrar página ao dashboard e navegação
 - [x] Adicionar testes para endpoints de histórico
+
+## Dashboard de Análise de Tendências de Alarmes
+- [x] Adicionar endpoints tRPC para análise de tendências (frequência por período, padrões temporais)
+- [x] Adicionar endpoint para análise de correlação entre métricas
+- [x] Criar página TrendAnalysis com visualizações avançadas
+- [x] Implementar gráficos de padrões temporais (heatmap de alarmes por hora/dia)
+- [x] Implementar matriz de correlação entre métricas
+- [x] Adicionar análise de frequência de alarmes por métrica
+- [x] Integrar página ao dashboard e navegação
+- [x] Adicionar testes para endpoints de tendências

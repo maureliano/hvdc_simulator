@@ -572,3 +572,293 @@ export async function getAlarmMetrics(userId?: number): Promise<string[]> {
     return [];
   }
 }
+
+
+/**
+ * Análise de tendências de alarmes - Frequência por período
+ */
+export async function getAlarmTrendAnalysis(
+  userId?: number,
+  daysBack: number = 30
+): Promise<{
+  daily: Array<{ date: string; count: number; critical: number; warning: number }>;
+  hourly: Array<{ hour: number; count: number; critical: number; warning: number }>;
+  byMetric: Array<{ metric: string; count: number; critical: number; warning: number }>;
+}> {
+  try {
+    const db = await getDatabase();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    const whereConditions: any[] = [gte(iffAlarmEvents.createdAt, startDate)];
+    if (userId) {
+      whereConditions.push(eq(iffAlarmEvents.userId, userId));
+    }
+
+    const allAlarms = await db
+      .select()
+      .from(iffAlarmEvents)
+      .where(and(...whereConditions));
+
+    // Análise diária
+    const dailyMap: Record<string, { count: number; critical: number; warning: number }> = {};
+    allAlarms.forEach((alarm: any) => {
+      const date = new Date(alarm.createdAt).toLocaleDateString("pt-BR");
+      if (!dailyMap[date]) {
+        dailyMap[date] = { count: 0, critical: 0, warning: 0 };
+      }
+      dailyMap[date].count++;
+      if (alarm.severity === "CRITICAL") dailyMap[date].critical++;
+      else dailyMap[date].warning++;
+    });
+
+    const daily = Object.entries(dailyMap)
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Análise por hora do dia
+    const hourlyMap: Record<number, { count: number; critical: number; warning: number }> = {};
+    for (let i = 0; i < 24; i++) {
+      hourlyMap[i] = { count: 0, critical: 0, warning: 0 };
+    }
+
+    allAlarms.forEach((alarm: any) => {
+      const hour = new Date(alarm.createdAt).getHours();
+      hourlyMap[hour].count++;
+      if (alarm.severity === "CRITICAL") hourlyMap[hour].critical++;
+      else hourlyMap[hour].warning++;
+    });
+
+    const hourly = Object.entries(hourlyMap).map(([hour, data]) => ({
+      hour: parseInt(hour),
+      ...data,
+    }));
+
+    // Análise por métrica
+    const metricMap: Record<string, { count: number; critical: number; warning: number }> = {};
+    allAlarms.forEach((alarm: any) => {
+      const metric = alarm.metricName || "Unknown";
+      if (!metricMap[metric]) {
+        metricMap[metric] = { count: 0, critical: 0, warning: 0 };
+      }
+      metricMap[metric].count++;
+      if (alarm.severity === "CRITICAL") metricMap[metric].critical++;
+      else metricMap[metric].warning++;
+    });
+
+    const byMetric = Object.entries(metricMap)
+      .map(([metric, data]) => ({ metric, ...data }))
+      .sort((a, b) => b.count - a.count);
+
+    return { daily, hourly, byMetric };
+  } catch (error) {
+    console.error("[Alarm Service] Error analyzing alarm trends:", error);
+    return { daily: [], hourly: [], byMetric: [] };
+  }
+}
+
+/**
+ * Análise de correlação entre métricas
+ */
+export async function getAlarmCorrelationAnalysis(
+  userId?: number,
+  daysBack: number = 30
+): Promise<{
+  correlations: Array<{
+    metric1: string;
+    metric2: string;
+    coOccurrenceCount: number;
+    percentage: number;
+  }>;
+  metricFrequency: Record<string, number>;
+}> {
+  try {
+    const db = await getDatabase();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    const whereConditions: any[] = [gte(iffAlarmEvents.createdAt, startDate)];
+    if (userId) {
+      whereConditions.push(eq(iffAlarmEvents.userId, userId));
+    }
+
+    const allAlarms = await db
+      .select()
+      .from(iffAlarmEvents)
+      .where(and(...whereConditions));
+
+    // Agrupar alarmes por período de tempo (1 hora)
+    const timeWindowMap: Record<string, Set<string>> = {};
+    allAlarms.forEach((alarm: any) => {
+      const date = new Date(alarm.createdAt);
+      const timeWindow = new Date(date.getTime() - (date.getTime() % (60 * 60 * 1000))).toISOString();
+      
+      if (!timeWindowMap[timeWindow]) {
+        timeWindowMap[timeWindow] = new Set();
+      }
+      timeWindowMap[timeWindow].add(alarm.metricName);
+    });
+
+    // Contar co-ocorrências
+    const coOccurrenceMap: Record<string, number> = {};
+    const metricFrequency: Record<string, number> = {};
+
+    Object.values(timeWindowMap).forEach((metrics) => {
+      const metricArray = Array.from(metrics);
+      
+      // Contar frequência de cada métrica
+      metricArray.forEach((metric) => {
+        metricFrequency[metric] = (metricFrequency[metric] || 0) + 1;
+      });
+
+      // Contar pares de co-ocorrência
+      for (let i = 0; i < metricArray.length; i++) {
+        for (let j = i + 1; j < metricArray.length; j++) {
+          const key = [metricArray[i], metricArray[j]].sort().join("|");
+          coOccurrenceMap[key] = (coOccurrenceMap[key] || 0) + 1;
+        }
+      }
+    });
+
+    // Calcular percentual de co-ocorrência
+    const totalWindows = Object.keys(timeWindowMap).length;
+    const correlations = Object.entries(coOccurrenceMap)
+      .map(([key, count]) => {
+        const [metric1, metric2] = key.split("|");
+        return {
+          metric1,
+          metric2,
+          coOccurrenceCount: count,
+          percentage: totalWindows > 0 ? (count / totalWindows) * 100 : 0,
+        };
+      })
+      .sort((a, b) => b.coOccurrenceCount - a.coOccurrenceCount)
+      .slice(0, 10); // Top 10 correlações
+
+    return { correlations, metricFrequency };
+  } catch (error) {
+    console.error("[Alarm Service] Error analyzing alarm correlations:", error);
+    return { correlations: [], metricFrequency: {} };
+  }
+}
+
+/**
+ * Padrões de falha - Heatmap de alarmes por hora e dia da semana
+ */
+export async function getAlarmHeatmapData(
+  userId?: number,
+  daysBack: number = 90
+): Promise<Array<{ dayOfWeek: number; hour: number; count: number }>> {
+  try {
+    const db = await getDatabase();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    const whereConditions: any[] = [gte(iffAlarmEvents.createdAt, startDate)];
+    if (userId) {
+      whereConditions.push(eq(iffAlarmEvents.userId, userId));
+    }
+
+    const allAlarms = await db
+      .select()
+      .from(iffAlarmEvents)
+      .where(and(...whereConditions));
+
+    // Criar matriz 7x24 (dia da semana x hora)
+    const heatmapData: Record<string, number> = {};
+    for (let day = 0; day < 7; day++) {
+      for (let hour = 0; hour < 24; hour++) {
+        heatmapData[`${day}|${hour}`] = 0;
+      }
+    }
+
+    allAlarms.forEach((alarm: any) => {
+      const date = new Date(alarm.createdAt);
+      const dayOfWeek = date.getDay();
+      const hour = date.getHours();
+      const key = `${dayOfWeek}|${hour}`;
+      heatmapData[key]++;
+    });
+
+    return Object.entries(heatmapData).map(([key, count]) => {
+      const [dayOfWeek, hour] = key.split("|").map(Number);
+      return { dayOfWeek, hour, count };
+    });
+  } catch (error) {
+    console.error("[Alarm Service] Error generating alarm heatmap:", error);
+    return [];
+  }
+}
+
+/**
+ * Estatísticas de resolução de alarmes
+ */
+export async function getAlarmResolutionStats(
+  userId?: number,
+  daysBack: number = 30
+): Promise<{
+  totalResolved: number;
+  averageResolutionTime: number; // em minutos
+  criticalResolutionTime: number;
+  warningResolutionTime: number;
+  unresolvedCount: number;
+}> {
+  try {
+    const db = await getDatabase();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - daysBack);
+
+    const whereConditions: any[] = [gte(iffAlarmEvents.createdAt, startDate)];
+    if (userId) {
+      whereConditions.push(eq(iffAlarmEvents.userId, userId));
+    }
+
+    const allAlarms = await db
+      .select()
+      .from(iffAlarmEvents)
+      .where(and(...whereConditions));
+
+    const resolvedAlarms = allAlarms.filter((a: any) => a.status === "RESOLVED");
+    const unresolvedAlarms = allAlarms.filter((a: any) => a.status !== "RESOLVED");
+
+    let totalResolutionTime = 0;
+    let criticalResolutionTime = 0;
+    let warningResolutionTime = 0;
+    let criticalCount = 0;
+    let warningCount = 0;
+
+    resolvedAlarms.forEach((alarm: any) => {
+      const createdTime = new Date(alarm.createdAt).getTime();
+      const resolvedTime = new Date(alarm.resolvedAt).getTime();
+      const resolutionMinutes = (resolvedTime - createdTime) / (1000 * 60);
+
+      totalResolutionTime += resolutionMinutes;
+
+      if (alarm.severity === "CRITICAL") {
+        criticalResolutionTime += resolutionMinutes;
+        criticalCount++;
+      } else {
+        warningResolutionTime += resolutionMinutes;
+        warningCount++;
+      }
+    });
+
+    return {
+      totalResolved: resolvedAlarms.length,
+      averageResolutionTime:
+        resolvedAlarms.length > 0 ? totalResolutionTime / resolvedAlarms.length : 0,
+      criticalResolutionTime: criticalCount > 0 ? criticalResolutionTime / criticalCount : 0,
+      warningResolutionTime: warningCount > 0 ? warningResolutionTime / warningCount : 0,
+      unresolvedCount: unresolvedAlarms.length,
+    };
+  } catch (error) {
+    console.error("[Alarm Service] Error getting alarm resolution stats:", error);
+    return {
+      totalResolved: 0,
+      averageResolutionTime: 0,
+      criticalResolutionTime: 0,
+      warningResolutionTime: 0,
+      unresolvedCount: 0,
+    };
+  }
+}

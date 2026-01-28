@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Calendar, Filter, AlertCircle, CheckCircle, Clock, TrendingUp, TrendingDown } from "lucide-react";
+import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,11 +153,19 @@ export function AlarmHistory() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Histórico de Alarmes</h1>
-        <p className="text-muted-foreground mt-2">
-          Visualize e analise todos os alarmes IFF disparados no sistema
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Histórico de Alarmes</h1>
+          <p className="text-muted-foreground mt-2">
+            Visualize e analise todos os alarmes IFF disparados no sistema
+          </p>
+        </div>
+        <Link href="/trend-analysis">
+          <Button variant="outline" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Tendências
+          </Button>
+        </Link>
       </div>
 
       {/* Statistics Cards */}
