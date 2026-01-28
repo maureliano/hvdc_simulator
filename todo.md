@@ -170,3 +170,14 @@
 - [x] Criar página ResearchResults com visualização dos 4 critérios
 - [x] Escrever seção de Metodologia para artigo
 - [x] Escrever seção de Resultados Experimentais
+
+
+## Geração de Dados Experimentais para Pesquisa
+- [x] Criar script de geração de 150 simulações com variação de parâmetros
+- [x] Implementar cálculo de IFF com 4 dimensões (Estado, Dinâmica, Energia, Estabilidade)
+- [x] Implementar análise de incertezas (σ_IFF) com propagação de erros
+- [x] Gerar dados com 5 níveis de ruído (0%, 1%, 2%, 5%, 10%)
+- [x] Implementar 5 modos de falha (none, sensor_drift, communication_delay, model_error, combined)
+- [x] Exportar dados para CSV com 20 colunas de métricas
+- [x] Criar análise estatística em Python com 4 gráficos profissionais
+- [x] Gerar relatório JSON com estatísticas completas
