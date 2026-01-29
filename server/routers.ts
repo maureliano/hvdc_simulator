@@ -40,53 +40,25 @@ import {
   getAlarmHeatmapData,
   getAlarmResolutionStats
 } from "./iff/alarm-service";
-import { spawn } from "child_process";
-import path from "path";
+import { runSimulation as runMemorySimulation } from "./hvdc-simulator-memory";
 
 
 // Helper function to run Python simulation
 function runPythonSimulation(params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const pythonScript = path.join(process.cwd(), "server", "hvdc_simulator.py");
-    const args = [
-      String(params.ac1Voltage || 345),
-      String(params.ac2Voltage || 230),
-      String(params.dcVoltage || 422.84),
-      String(params.loadMw || 1000),
-    ];
-
-    const python = spawn("python3", [pythonScript, ...args], {
-      cwd: process.cwd(),
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    python.stdout.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    python.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    python.on("close", (code) => {
-      if (code !== 0) {
-        reject(new Error(`Python script failed: ${stderr}`));
-        return;
-      }
-
-      try {
-        const result = JSON.parse(stdout);
-        resolve(result);
-      } catch (error) {
-        reject(new Error(`Failed to parse simulation result: ${error}`));
-      }
-    });
-
-    python.on("error", (error) => {
-      reject(error);
-    });
+  return new Promise((resolve) => {
+    try {
+      const result = runMemorySimulation({
+        ac1_voltage: params.ac1Voltage || 345,
+        ac2_voltage: params.ac2Voltage || 230,
+        dc_voltage: params.dcVoltage || 422.84,
+        load_mw: params.loadMw || 1000,
+        failure_mode: params.failure_mode || 'none',
+        noise_level: params.noise_level || 0,
+      });
+      resolve(result);
+    } catch (error) {
+      resolve({ status: 'error', error: String(error) });
+    }
   });
 }
 
