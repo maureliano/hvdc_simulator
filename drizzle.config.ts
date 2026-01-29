@@ -6,14 +6,18 @@ if (!connectionString) {
 }
 
 // Detectar tipo de banco de dados pela string de conexão
+const isPostgres = connectionString.startsWith("postgresql://") || connectionString.startsWith("postgres://");
 const isSQLite = connectionString.startsWith("file:");
+const isMySQL = !isPostgres && !isSQLite;
 
 // Configuração unificada
 export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle",
-  dialect: isSQLite ? "sqlite" : "mysql",
-  dbCredentials: isSQLite 
+  dialect: isPostgres ? "postgresql" : isSQLite ? "sqlite" : "mysql",
+  dbCredentials: isPostgres
+    ? { url: connectionString }
+    : isSQLite
     ? { url: connectionString.replace("file:", "") }
     : { url: connectionString },
 });

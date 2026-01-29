@@ -1,19 +1,18 @@
-import { sql } from "drizzle-orm";
-import { mysqlTable, int, varchar, text, double, timestamp } from "drizzle-orm/mysql-core";
+import { pgTable, serial, varchar, text, doublePrecision, timestamp, integer } from "drizzle-orm/pg-core";
 
 /**
  * Core user table backing auth flow.
- * MySQL/TiDB version for cloud deployment
+ * PostgreSQL version for local development
  */
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 50 }),
-  role: varchar("role", { length: 20, enum: ["user", "admin"] }).default("user").notNull(),
+  role: varchar("role", { length: 20 }).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().onUpdateNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
@@ -24,21 +23,21 @@ export type InsertUser = typeof users.$inferInsert;
  * Circuit configurations table
  * Stores HVDC circuit parameters and simulation settings
  */
-export const circuitConfigs = mysqlTable("circuit_configs", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const circuitConfigs = pgTable("circuit_configs", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   
   // AC System parameters
-  ac1Voltage: double("ac1Voltage").notNull().default(345.0), // kV
-  ac2Voltage: double("ac2Voltage").notNull().default(230.0), // kV
-  dcVoltage: double("dcVoltage").notNull().default(422.84), // kV
-  powerMva: double("powerMva").notNull().default(1196.0), // MVA
-  loadMw: double("loadMw").notNull().default(1000.0), // MW
+  ac1Voltage: doublePrecision("ac1Voltage").notNull().default(345.0), // kV
+  ac2Voltage: doublePrecision("ac2Voltage").notNull().default(230.0), // kV
+  dcVoltage: doublePrecision("dcVoltage").notNull().default(422.84), // kV
+  powerMva: doublePrecision("powerMva").notNull().default(1196.0), // MVA
+  loadMw: doublePrecision("loadMw").notNull().default(1000.0), // MW
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().onUpdateNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type CircuitConfig = typeof circuitConfigs.$inferSelect;
@@ -48,77 +47,68 @@ export type InsertCircuitConfig = typeof circuitConfigs.$inferInsert;
  * Simulation results table
  * Stores historical simulation results
  */
-export const simulationResults = mysqlTable("simulation_results", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  configId: int("configId"),
+export const simulationResults = pgTable("simulation_results", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  circuitConfigId: integer("circuitConfigId"),
   
-  // Simulation parameters used
-  parameters: text("parameters").notNull(), // JSON string
+  // Input parameters
+  ac1Voltage: doublePrecision("ac1Voltage").notNull(),
+  ac2Voltage: doublePrecision("ac2Voltage").notNull(),
+  dcVoltage: doublePrecision("dcVoltage").notNull(),
+  loadMw: doublePrecision("loadMw").notNull(),
   
-  // Results summary
-  totalGenerationMw: double("totalGenerationMw"),
-  totalLoadMw: double("totalLoadMw"),
-  totalLossesMw: double("totalLossesMw"),
-  efficiencyPercent: double("efficiencyPercent"),
-  converged: int("converged").notNull().default(1), // boolean as int
+  // Output results
+  convergence: integer("convergence").notNull().default(1), // 1 = true, 0 = false
+  busAc1VoltageKv: doublePrecision("busAc1VoltageKv"),
+  busAc2VoltageKv: doublePrecision("busAc2VoltageKv"),
+  busDc1VoltageKv: doublePrecision("busDc1VoltageKv"),
+  busDc2VoltageKv: doublePrecision("busDc2VoltageKv"),
   
-  // Full results JSON
-  fullResults: text("fullResults").notNull(), // JSON string with all details
+  transformer1PMw: doublePrecision("transformer1PMw"),
+  transformer1QMvar: doublePrecision("transformer1QMvar"),
+  transformer2PMw: doublePrecision("transformer2PMw"),
+  transformer2QMvar: doublePrecision("transformer2QMvar"),
   
+  totalLossMw: doublePrecision("totalLossMw"),
+  transformer1Loss: doublePrecision("transformer1Loss"),
+  transformer2Loss: doublePrecision("transformer2Loss"),
+  
+  overallEfficiency: doublePrecision("overallEfficiency"),
+  
+  executionTimeMs: integer("executionTimeMs"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type SimulationResult = typeof simulationResults.$inferSelect;
 export type InsertSimulationResult = typeof simulationResults.$inferInsert;
 
-
-/**
- * IFF Test Scenarios table
- * Stores test scenario configurations for IFF Framework
- */
-export const iffTestScenarios = mysqlTable("iff_test_scenarios", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId"),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  scenarioType: varchar("scenarioType", { length: 100 }).notNull(),
-  parameters: text("parameters").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().onUpdateNow(),
-});
-
-export type IFFTestScenario = typeof iffTestScenarios.$inferSelect;
-export type InsertIFFTestScenario = typeof iffTestScenarios.$inferInsert;
-
 /**
  * IFF Test Results table
- * Stores detailed results from IFF Framework evaluations
+ * Stores Physical Fidelity Index test results
  */
-export const iffTestResults = mysqlTable("iff_test_results", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId"),
-  scenarioId: int("scenarioId"),
+export const iffTestResults = pgTable("iff_test_results", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
   testName: varchar("testName", { length: 255 }).notNull(),
   scenarioType: varchar("scenarioType", { length: 100 }).notNull(),
-  executionTime: int("executionTime").notNull(),
-  overallIFFScore: double("overallIFFScore").notNull(),
+  
+  // IFF Dimensions (0-1 scale)
+  stateFidelity: doublePrecision("stateFidelity").notNull(),
+  dynamicsFidelity: doublePrecision("dynamicsFidelity").notNull(),
+  energyFidelity: doublePrecision("energyFidelity").notNull(),
+  stabilityFidelity: doublePrecision("stabilityFidelity").notNull(),
+  overallIFFScore: doublePrecision("overallIFFScore").notNull(),
+  
+  // System metrics
   systemTrustworthiness: varchar("systemTrustworthiness", { length: 50 }).notNull(),
-  dynamicFidelityIndex: double("dynamicFidelityIndex"),
-  voltageErrorPercent: double("voltageErrorPercent"),
-  currentErrorPercent: double("currentErrorPercent"),
-  powerErrorPercent: double("powerErrorPercent"),
-  frequencyErrorHz: double("frequencyErrorHz"),
-  estimationErrorPercent: double("estimationErrorPercent"),
-  measurementUncertaintyPercent: double("measurementUncertaintyPercent"),
-  communicationLatencyMs: double("communicationLatencyMs"),
-  overallUncertaintyPercent: double("overallUncertaintyPercent"),
-  confidenceLevel: double("confidenceLevel"),
-  agenticDecision: varchar("agenticDecision", { length: 50 }).notNull(),
-  decisionConfidence: double("decisionConfidence"),
-  fullResults: text("fullResults").notNull(),
-  notes: text("notes"),
+  agenticDecision: varchar("agenticDecision", { length: 100 }).notNull(),
+  
+  executionTime: integer("executionTime").notNull(),
+  fullResults: text("fullResults"),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type IFFTestResult = typeof iffTestResults.$inferSelect;
@@ -126,18 +116,17 @@ export type InsertIFFTestResult = typeof iffTestResults.$inferInsert;
 
 /**
  * IFF Test Events table
- * Stores individual events and alarms during IFF testing
+ * Stores detailed events from IFF tests
  */
-export const iffTestEvents = mysqlTable("iff_test_events", {
-  id: int("id").autoincrement().primaryKey(),
-  testResultId: int("testResultId").notNull(),
+export const iffTestEvents = pgTable("iff_test_events", {
+  id: serial("id").primaryKey(),
+  testResultId: integer("testResultId").notNull(),
   eventType: varchar("eventType", { length: 100 }).notNull(),
-  eventName: varchar("eventName", { length: 255 }).notNull(),
-  description: text("description"),
-  severity: varchar("severity", { length: 50 }).notNull(),
-  timestamp: timestamp("timestamp").notNull(),
-  metricValue: double("metricValue"),
-  threshold: double("threshold"),
+  metric: varchar("metric", { length: 100 }).notNull(),
+  value: doublePrecision("value").notNull(),
+  threshold: doublePrecision("threshold"),
+  status: varchar("status", { length: 50 }).notNull(),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -145,46 +134,51 @@ export type IFFTestEvent = typeof iffTestEvents.$inferSelect;
 export type InsertIFFTestEvent = typeof iffTestEvents.$inferInsert;
 
 /**
- * IFF Alarm Thresholds table
- * Stores configurable alarm thresholds for IFF score monitoring
+ * Alarm Thresholds table
+ * Stores configured thresholds for IFF alarming
  */
-export const iffAlarmThresholds = mysqlTable("iff_alarm_thresholds", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId"),
-  metricName: varchar("metricName", { length: 100 }).notNull(), // e.g., "overallIFFScore", "dynamicFidelityIndex"
-  criticalThreshold: double("criticalThreshold").notNull(), // Score below this triggers CRITICAL alarm
-  warningThreshold: double("warningThreshold").notNull(), // Score below this triggers WARNING alarm
-  enabled: int("enabled").notNull().default(1), // boolean as int
-  description: text("description"),
+export const iffAlarmThresholds = pgTable("iff_alarm_thresholds", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
+  metricName: varchar("metricName", { length: 100 }).notNull(),
+  criticalThreshold: doublePrecision("criticalThreshold").notNull(),
+  warningThreshold: doublePrecision("warningThreshold").notNull(),
+  enabled: integer("enabled").notNull().default(1),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().onUpdateNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type IFFAlarmThreshold = typeof iffAlarmThresholds.$inferSelect;
 export type InsertIFFAlarmThreshold = typeof iffAlarmThresholds.$inferInsert;
 
 /**
- * IFF Alarm Events table
- * Stores alarm events triggered when metrics cross thresholds
+ * Alarm Events table
+ * Stores alarm events triggered by threshold violations
  */
-export const iffAlarmEvents = mysqlTable("iff_alarm_events", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId"),
-  testResultId: int("testResultId"),
-  thresholdId: int("thresholdId"),
+export const iffAlarmEvents = pgTable("iff_alarm_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
+  testResultId: integer("testResultId"),
+  thresholdId: integer("thresholdId"),
+  
   metricName: varchar("metricName", { length: 100 }).notNull(),
-  metricValue: double("metricValue").notNull(),
-  threshold: double("threshold").notNull(),
-  severity: varchar("severity", { length: 20, enum: ["WARNING", "CRITICAL"] }).notNull(),
-  status: varchar("status", { length: 20, enum: ["ACTIVE", "ACKNOWLEDGED", "RESOLVED"] }).notNull().default("ACTIVE"),
-  message: text("message").notNull(),
+  metricValue: doublePrecision("metricValue").notNull(),
+  threshold: doublePrecision("threshold").notNull(),
+  
+  severity: varchar("severity", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  message: text("message"),
+  
   acknowledgedAt: timestamp("acknowledgedAt"),
   acknowledgedBy: varchar("acknowledgedBy", { length: 255 }),
+  
   resolvedAt: timestamp("resolvedAt"),
   resolvedBy: varchar("resolvedBy", { length: 255 }),
   resolutionNotes: text("resolutionNotes"),
+  
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull().onUpdateNow(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type IFFAlarmEvent = typeof iffAlarmEvents.$inferSelect;

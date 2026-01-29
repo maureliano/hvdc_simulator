@@ -1,6 +1,5 @@
 import { getDb } from "./db";
 import { 
-  iffTestScenarios, 
   iffTestResults, 
   iffTestEvents,
   InsertIFFTestResult,
@@ -103,7 +102,7 @@ export async function getIFFTestEvents(testResultId: number): Promise<IFFTestEve
       .select()
       .from(iffTestEvents)
       .where(eq(iffTestEvents.testResultId, testResultId))
-      .orderBy(desc(iffTestEvents.timestamp));
+      .orderBy(desc(iffTestEvents.createdAt));
     
     return events;
   } catch (error) {
@@ -167,7 +166,7 @@ export async function getIFFTestStatistics(
     const allEvents = await db
       .select()
       .from(iffTestEvents)
-      .where(eq(iffTestEvents.severity, "critical"));
+      .where(eq(iffTestEvents.status, "critical"));
 
     const criticalEvents = allEvents.length;
 
