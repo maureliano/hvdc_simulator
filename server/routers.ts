@@ -41,6 +41,7 @@ import {
   getAlarmResolutionStats
 } from "./iff/alarm-service";
 import { runSimulation as runMemorySimulation } from "./hvdc-simulator-memory";
+import { eventsRouter } from "./routers_events";
 
 
 // Helper function to run Python simulation
@@ -470,6 +471,9 @@ export const appRouter = router({
         return await getAlarmResolutionStats(input.userId, input.daysBack);
       }),
   }),
+
+  // Events and Alarms History
+  events: eventsRouter,
 });
 
 export type AppRouter = typeof appRouter;

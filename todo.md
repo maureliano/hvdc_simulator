@@ -190,3 +190,11 @@
 - [x] Criar guia completo de setup PostgreSQL (COMPLETE_SETUP_GUIDE.md)
 - [ ] Testar aplicação completa com banco de dados
 - [ ] Salvar checkpoint final com todas as alterações
+
+
+## Visualização de Histórico de Eventos e Alarmes
+- [x] Criar endpoints tRPC para buscar eventos e alarmes do banco
+- [x] Implementar página EventHistory com filtros avançados
+- [x] Adicionar visualizações (timeline, gráficos, tabelas)
+- [x] Integrar ao menu de navegação
+- [x] Testar integração com banco de dados

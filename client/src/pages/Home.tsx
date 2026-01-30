@@ -90,6 +90,12 @@ export default function Home() {
                 Pesquisa
               </Button>
             </Link>
+            <Link href="/event-history">
+              <Button variant="outline" className="gap-2">
+                <Activity className="h-4 w-4" />
+                Eventos
+              </Button>
+            </Link>
             </div>
           </div>
         </div>
