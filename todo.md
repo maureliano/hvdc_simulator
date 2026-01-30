@@ -181,3 +181,12 @@
 - [x] Exportar dados para CSV com 20 colunas de métricas
 - [x] Criar análise estatística em Python com 4 gráficos profissionais
 - [x] Gerar relatório JSON com estatísticas completas
+
+
+## Refatoração Completa com PostgreSQL Local
+- [x] Atualizar package.json com scripts Windows corretos
+- [x] Verificar simulador em memória funcional
+- [x] Confirmar integração PostgreSQL/Drizzle ORM
+- [x] Criar guia completo de setup PostgreSQL (COMPLETE_SETUP_GUIDE.md)
+- [ ] Testar aplicação completa com banco de dados
+- [ ] Salvar checkpoint final com todas as alterações
