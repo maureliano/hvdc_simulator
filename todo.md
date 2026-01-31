@@ -206,3 +206,10 @@
 - [x] Configurar banco de dados PostgreSQL gratuito (Neon)
 - [x] Publicar em Railway ou Render (instruções no DEPLOY_GUIDE.md)
 - [x] Criar guia de deploy (DEPLOY_GUIDE.md completo)
+
+## Deploy 100% Gratuito em Replit
+- [x] Criar guia completo REPLIT_DEPLOY.md
+- [x] Configurar arquivo .replit para Replit
+- [x] Criar README_REPLIT.md com instruções rápidas
+- [x] Documentar como manter aplicação online 24/7 gratuitamente
+- [x] Incluir troubleshooting e dicas

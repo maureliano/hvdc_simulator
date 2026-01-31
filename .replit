@@ -1,0 +1,29 @@
+run = "pnpm dev"
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-23_11"
+
+[unitTest]
+language = "nodejs"
+
+[languages.javascript]
+pattern = "**/*.{js,jsx,ts,tsx}"
+
+[languages.javascript.languageServer]
+start = "typescript-language-server --stdio"
+
+[debugger]
+support = true
+
+[debugger.interactive]
+transport = "localhost:0"
+startCommand = ["dap-node"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 5432
+externalPort = 5432
