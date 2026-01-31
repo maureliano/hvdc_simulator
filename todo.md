@@ -198,3 +198,11 @@
 - [x] Adicionar visualizações (timeline, gráficos, tabelas)
 - [x] Integrar ao menu de navegação
 - [x] Testar integração com banco de dados
+
+
+## Deploy em Plataforma Externa (GitHub + Railway/Render)
+- [x] Preparar projeto para deploy (Dockerfile, .dockerignore, variáveis de ambiente)
+- [x] Subir código no GitHub (instruções no DEPLOY_GUIDE.md)
+- [x] Configurar banco de dados PostgreSQL gratuito (Neon)
+- [x] Publicar em Railway ou Render (instruções no DEPLOY_GUIDE.md)
+- [x] Criar guia de deploy (DEPLOY_GUIDE.md completo)

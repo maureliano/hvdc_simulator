@@ -1,32 +1,20 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertUser, users, circuitConfigs, simulationResults, InsertCircuitConfig, InsertSimulationResult } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { desc, eq } from "drizzle-orm";
 
 let _db: any = null;
-let _connection: mysql.Connection | null = null;
+let _connection: postgres.Sql | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // Parse MySQL connection string
-      const url = new URL(process.env.DATABASE_URL);
-      
-      // Create connection
-      _connection = await mysql.createConnection({
-        host: url.hostname,
-        port: url.port ? parseInt(url.port) : 3306,
-        user: url.username,
-        password: url.password,
-        database: url.pathname.slice(1),
-        ssl: {},
-      });
-      
+      _connection = postgres(process.env.DATABASE_URL);
       _db = drizzle(_connection);
       
-      console.log(`[Database] Connected to MySQL: ${url.hostname}`);
+      console.log(`[Database] Connected to PostgreSQL`);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -121,7 +109,7 @@ export async function createCircuitConfig(config: InsertCircuitConfig) {
   }
 
   await db.insert(circuitConfigs).values(config);
-  // MySQL não suporta returning, buscar o último registro inserido
+    // PostgreSQL suporta returning
   const inserted = await db.select().from(circuitConfigs).orderBy(desc(circuitConfigs.id)).limit(1);
   return inserted[0];
 }
@@ -165,7 +153,7 @@ export async function saveSimulationResult(result: InsertSimulationResult) {
   }
 
   await db.insert(simulationResults).values(result);
-  // MySQL não suporta returning, buscar o último registro inserido
+    // PostgreSQL suporta returning
   const inserted = await db.select().from(simulationResults).orderBy(desc(simulationResults.id)).limit(1);
   return inserted[0];
 }
