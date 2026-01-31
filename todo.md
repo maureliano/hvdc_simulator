@@ -213,3 +213,11 @@
 - [x] Criar README_REPLIT.md com instruções rápidas
 - [x] Documentar como manter aplicação online 24/7 gratuitamente
 - [x] Incluir troubleshooting e dicas
+
+## Deploy em AWS Lightsail
+- [x] Criar guia completo LIGHTSAIL_DEPLOY.md com passo a passo
+- [x] Criar script de setup automático (lightsail-setup.sh)
+- [x] Criar arquivo de configuração Nginx otimizado (nginx.conf.example)
+- [x] Incluir instruções de SSL/HTTPS com Let's Encrypt
+- [x] Incluir script de backup automático do banco de dados
+- [x] Incluir troubleshooting e dicas de otimização
