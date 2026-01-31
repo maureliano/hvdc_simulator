@@ -1,10 +1,11 @@
 #!/bin/bash
 
 ###############################################################################
-# HVDC Simulator - AWS Lightsail Setup Script
+# HVDC Simulator - AWS Lightsail Setup Script (Amazon Linux 2)
 # Este script automatiza todo o setup da aplicação em uma instância Lightsail
+# com Amazon Linux 2 (mais leve e rápido que Ubuntu)
 # 
-# Uso: bash lightsail-setup.sh
+# Uso: bash lightsail-setup-amazon-linux.sh
 ###############################################################################
 
 set -e  # Exit on error
@@ -39,73 +40,66 @@ print_info() {
     echo -e "${BLUE}ℹ $1${NC}"
 }
 
-# Verificar se está rodando como ubuntu
-if [ "$USER" != "ubuntu" ]; then
-    print_error "Este script deve ser executado como usuário 'ubuntu'"
-    exit 1
-fi
-
 ###############################################################################
 # PASSO 1: Atualizar Sistema
 ###############################################################################
 print_header "PASSO 1: Atualizando Sistema"
 
-sudo apt-get update
-sudo apt-get upgrade -y
+sudo yum update -y
+sudo yum upgrade -y
 print_success "Sistema atualizado"
 
 ###############################################################################
-# PASSO 2: Instalar Node.js
+# PASSO 2: Instalar Node.js (Amazon Linux 2)
 ###############################################################################
-print_header "PASSO 2: Instalando Node.js"
+print_header "PASSO 2: Instalando Node.js 20"
 
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
+# Amazon Linux usa yum, não apt-get
+sudo yum install -y nodejs npm
 print_success "Node.js $(node --version) instalado"
+print_success "NPM $(npm --version) instalado"
 
 ###############################################################################
-# PASSO 3: Instalar pnpm
+# PASSO 3: Instalar Nginx
 ###############################################################################
-print_header "PASSO 3: Instalando pnpm"
+print_header "PASSO 3: Instalando Nginx"
 
-# Usar sudo para instalar globalmente com permissões corretas
-sudo npm install -g pnpm
-print_success "pnpm $(pnpm --version) instalado"
-
-###############################################################################
-# PASSO 4: Instalar Nginx
-###############################################################################
-print_header "PASSO 4: Instalando Nginx"
-
-sudo apt-get install -y nginx
+sudo yum install -y nginx
 sudo systemctl start nginx
 sudo systemctl enable nginx
 print_success "Nginx instalado e iniciado"
 
 ###############################################################################
-# PASSO 5: Instalar PM2
+# PASSO 4: Instalar PM2
 ###############################################################################
-print_header "PASSO 5: Instalando PM2"
+print_header "PASSO 4: Instalando PM2"
 
 sudo npm install -g pm2
-sudo pm2 completion install
 print_success "PM2 $(pm2 --version) instalado"
 
 ###############################################################################
-# PASSO 6: Instalar Git
+# PASSO 5: Instalar Git
 ###############################################################################
-print_header "PASSO 6: Instalando Git"
+print_header "PASSO 5: Instalando Git"
 
-sudo apt-get install -y git
+sudo yum install -y git
 print_success "Git $(git --version | cut -d' ' -f3) instalado"
 
 ###############################################################################
-# PASSO 7: Instalar PostgreSQL Client
+# PASSO 6: Instalar PostgreSQL Client
 ###############################################################################
-print_header "PASSO 7: Instalando PostgreSQL Client"
+print_header "PASSO 6: Instalando PostgreSQL Client"
 
-sudo apt-get install -y postgresql-client
+sudo yum install -y postgresql15
 print_success "PostgreSQL Client instalado"
+
+###############################################################################
+# PASSO 7: Instalar Ferramentas Adicionais
+###############################################################################
+print_header "PASSO 7: Instalando Ferramentas Adicionais"
+
+sudo yum install -y curl wget openssl
+print_success "Ferramentas instaladas"
 
 ###############################################################################
 # PASSO 8: Clonar Repositório
@@ -119,7 +113,7 @@ if [ -z "$REPO_URL" ]; then
     exit 1
 fi
 
-cd /home/ubuntu
+cd /home/ec2-user
 git clone "$REPO_URL" hvdc_simulator 2>/dev/null || {
     print_warning "Repositório já existe, atualizando..."
     cd hvdc_simulator
@@ -127,15 +121,16 @@ git clone "$REPO_URL" hvdc_simulator 2>/dev/null || {
     cd ..
 }
 
-cd /home/ubuntu/hvdc_simulator
+cd /home/ec2-user/hvdc_simulator
 print_success "Repositório clonado/atualizado"
 
 ###############################################################################
-# PASSO 9: Instalar Dependências
+# PASSO 9: Instalar Dependências com NPM
 ###############################################################################
-print_header "PASSO 9: Instalando Dependências"
+print_header "PASSO 9: Instalando Dependências com NPM"
 
-pnpm install
+# Usar limite de memória para evitar OOM
+NODE_OPTIONS="--max-old-space-size=1024" npm install
 print_success "Dependências instaladas"
 
 ###############################################################################
@@ -143,7 +138,7 @@ print_success "Dependências instaladas"
 ###############################################################################
 print_header "PASSO 10: Configurando Variáveis de Ambiente"
 
-if [ -f /home/ubuntu/hvdc_simulator/.env ]; then
+if [ -f /home/ec2-user/hvdc_simulator/.env ]; then
     print_warning "Arquivo .env já existe, pulando..."
 else
     read -p "Digite a DATABASE_URL (PostgreSQL connection string): " DATABASE_URL
@@ -156,7 +151,7 @@ else
     
     JWT_SECRET=$(openssl rand -base64 32)
     
-    cat > /home/ubuntu/hvdc_simulator/.env << EOF
+    cat > /home/ec2-user/hvdc_simulator/.env << EOF
 # Database
 DATABASE_URL=$DATABASE_URL
 
@@ -179,7 +174,7 @@ fi
 ###############################################################################
 print_header "PASSO 11: Executando Migrations do Banco de Dados"
 
-pnpm db:push
+NODE_OPTIONS="--max-old-space-size=1024" npm run db:push
 print_success "Migrations executadas"
 
 ###############################################################################
@@ -187,7 +182,7 @@ print_success "Migrations executadas"
 ###############################################################################
 print_header "PASSO 12: Fazendo Build do Projeto"
 
-pnpm build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 print_success "Build concluído"
 
 ###############################################################################
@@ -195,8 +190,8 @@ print_success "Build concluído"
 ###############################################################################
 print_header "PASSO 13: Criando Diretórios de Logs"
 
-mkdir -p /home/ubuntu/hvdc_simulator/logs
-mkdir -p /home/ubuntu/backups
+mkdir -p /home/ec2-user/hvdc_simulator/logs
+mkdir -p /home/ec2-user/backups
 print_success "Diretórios criados"
 
 ###############################################################################
@@ -204,7 +199,7 @@ print_success "Diretórios criados"
 ###############################################################################
 print_header "PASSO 14: Configurando PM2"
 
-cat > /home/ubuntu/hvdc_simulator/ecosystem.config.js << 'EOF'
+cat > /home/ec2-user/hvdc_simulator/ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [
     {
@@ -216,8 +211,8 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000
       },
-      error_file: '/home/ubuntu/hvdc_simulator/logs/err.log',
-      out_file: '/home/ubuntu/hvdc_simulator/logs/out.log',
+      error_file: '/home/ec2-user/hvdc_simulator/logs/err.log',
+      out_file: '/home/ec2-user/hvdc_simulator/logs/out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       watch: false,
@@ -228,10 +223,10 @@ module.exports = {
 };
 EOF
 
-cd /home/ubuntu/hvdc_simulator
+cd /home/ec2-user/hvdc_simulator
 sudo pm2 start ecosystem.config.js
 sudo pm2 save
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ec2-user --hp /home/ec2-user
 
 print_success "PM2 configurado e aplicação iniciada"
 
@@ -247,7 +242,7 @@ if [ -z "$DOMAIN" ]; then
     print_warning "Usando localhost. Configure seu domínio depois."
 fi
 
-sudo tee /etc/nginx/sites-available/hvdc-simulator > /dev/null << EOF
+sudo tee /etc/nginx/conf.d/hvdc-simulator.conf > /dev/null << EOF
 upstream hvdc_app {
     server 127.0.0.1:3000;
 }
@@ -275,8 +270,6 @@ server {
 }
 EOF
 
-sudo ln -sf /etc/nginx/sites-available/hvdc-simulator /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 
@@ -287,14 +280,14 @@ print_success "Nginx configurado"
 ###############################################################################
 print_header "PASSO 16: Criando Script de Backup"
 
-cat > /home/ubuntu/backup-db.sh << 'EOF'
+cat > /home/ec2-user/backup-db.sh << 'EOF'
 #!/bin/bash
 
-BACKUP_DIR="/home/ubuntu/backups"
+BACKUP_DIR="/home/ec2-user/backups"
 mkdir -p $BACKUP_DIR
 
 # Extrair DATABASE_URL do .env
-DATABASE_URL=$(grep DATABASE_URL /home/ubuntu/hvdc_simulator/.env | cut -d'=' -f2)
+DATABASE_URL=$(grep DATABASE_URL /home/ec2-user/hvdc_simulator/.env | cut -d'=' -f2)
 
 # Fazer backup
 pg_dump "$DATABASE_URL" | gzip > $BACKUP_DIR/backup-$(date +%Y%m%d-%H%M%S).sql.gz
@@ -305,10 +298,10 @@ find $BACKUP_DIR -name "backup-*.sql.gz" -mtime +7 -delete
 echo "Backup realizado: $BACKUP_DIR/backup-$(date +%Y%m%d-%H%M%S).sql.gz"
 EOF
 
-chmod +x /home/ubuntu/backup-db.sh
+chmod +x /home/ec2-user/backup-db.sh
 
 # Agendar backup diário
-(crontab -l 2>/dev/null; echo "0 2 * * * /home/ubuntu/backup-db.sh") | crontab -
+(crontab -l 2>/dev/null; echo "0 2 * * * /home/ec2-user/backup-db.sh") | crontab -
 
 print_success "Script de backup criado e agendado"
 
@@ -330,7 +323,7 @@ echo "  - Ver status: pm2 status"
 echo "  - Ver logs: pm2 logs hvdc-simulator"
 echo "  - Reiniciar: pm2 restart hvdc-simulator"
 echo "  - Parar: pm2 stop hvdc-simulator"
-echo "  - Atualizar código: cd /home/ubuntu/hvdc_simulator && git pull && pnpm install && pnpm build && pm2 restart hvdc-simulator"
+echo "  - Atualizar código: cd /home/ec2-user/hvdc_simulator && git pull && npm install && npm run build && pm2 restart hvdc-simulator"
 echo ""
 
 echo "🔐 Próximos Passos:"
