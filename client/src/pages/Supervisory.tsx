@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { io, Socket } from "socket.io-client";
 import { Activity, AlertTriangle, Zap, TrendingUp, Power, Gauge } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -58,10 +57,78 @@ interface MonitoringData {
   }[];
 }
 
+// Mock data generator
+function generateMockData(params: { acVoltage1: number; acVoltage2: number; dcVoltage: number; loadPower: number }): MonitoringData {
+  const totalGeneration = params.loadPower * 1.05; // 5% more than load
+  const losses = totalGeneration * 0.03; // 3% losses
+  const efficiency = ((totalGeneration - losses) / totalGeneration) * 100;
+
+  return {
+    timestamp: Date.now(),
+    buses: [
+      {
+        id: 1,
+        name: "Bus 1 (AC)",
+        voltage_pu: params.acVoltage1 / 345,
+        voltage_kv: params.acVoltage1,
+        status: "normal",
+      },
+      {
+        id: 2,
+        name: "Bus 2 (AC)",
+        voltage_pu: params.acVoltage2 / 230,
+        voltage_kv: params.acVoltage2,
+        status: "normal",
+      },
+    ],
+    transformers: [
+      {
+        id: 1,
+        name: "Transformer 1",
+        loading_percent: 75,
+        power_mw: params.loadPower * 0.5,
+        status: "normal",
+      },
+      {
+        id: 2,
+        name: "Transformer 2",
+        loading_percent: 68,
+        power_mw: params.loadPower * 0.45,
+        status: "normal",
+      },
+    ],
+    dcLink: {
+      voltage_kv: params.dcVoltage,
+      current_ka: (params.loadPower * 1000) / params.dcVoltage,
+      power_mw: params.loadPower,
+      status: "normal",
+    },
+    converters: {
+      rectifier: {
+        power_mw: params.loadPower * 0.5,
+        efficiency: 98.5,
+        status: "normal",
+      },
+      inverter: {
+        power_mw: params.loadPower * 0.5,
+        efficiency: 98.2,
+        status: "normal",
+      },
+    },
+    system: {
+      totalGeneration_mw: totalGeneration,
+      totalLoad_mw: params.loadPower,
+      losses_mw: losses,
+      efficiency: efficiency,
+      status: "normal",
+    },
+    alarms: [],
+  };
+}
+
 export default function Supervisory() {
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [data, setData] = useState<MonitoringData | null>(null);
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(true);
   const [params, setParams] = useState({
     acVoltage1: 345,
     acVoltage2: 230,
@@ -69,36 +136,21 @@ export default function Supervisory() {
     loadPower: 1000,
   });
 
+  // Initialize with mock data
   useEffect(() => {
-    const newSocket = io(window.location.origin, {
-      path: "/socket.io/",
-    });
-
-    newSocket.on("connect", () => {
-      console.log("WebSocket connected");
-      setConnected(true);
-    });
-
-    newSocket.on("disconnect", () => {
-      console.log("WebSocket disconnected");
-      setConnected(false);
-    });
-
-    newSocket.on("monitoringData", (newData: MonitoringData) => {
-      setData(newData);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
-    };
+    setData(generateMockData(params));
   }, []);
 
+  // Update data when params change
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setData(generateMockData(params));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [params]);
+
   const updateParams = () => {
-    if (socket) {
-      socket.emit("updateParams", params);
-    }
+    setData(generateMockData(params));
   };
 
   const getStatusColor = (status: "normal" | "warning" | "alarm") => {
@@ -141,8 +193,7 @@ export default function Supervisory() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center space-y-4">
           <Activity className="h-12 w-12 animate-pulse text-blue-500 mx-auto" />
-          <p className="text-slate-400">Conectando ao sistema de monitoramento...</p>
-          <div className={`w-3 h-3 rounded-full mx-auto ${connected ? "bg-green-500" : "bg-red-500"} animate-pulse`} />
+          <p className="text-slate-400">Carregando sistema de monitoramento...</p>
         </div>
       </div>
     );
@@ -202,7 +253,7 @@ export default function Supervisory() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{data.system.totalGeneration_mw.toFixed(1)}</div>
-            <p className="text-xs text-slate-400 mt-1">MW</p>
+            <p className="text-xs text-slate-400 mt-1">MW - Potência gerada</p>
           </CardContent>
         </Card>
 
@@ -215,7 +266,7 @@ export default function Supervisory() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{data.system.totalLoad_mw.toFixed(1)}</div>
-            <p className="text-xs text-slate-400 mt-1">MW</p>
+            <p className="text-xs text-slate-400 mt-1">MW - Consumo de carga</p>
           </CardContent>
         </Card>
 
@@ -228,7 +279,7 @@ export default function Supervisory() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{data.system.efficiency.toFixed(2)}</div>
-            <p className="text-xs text-slate-400 mt-1">%</p>
+            <p className="text-xs text-slate-400 mt-1">% - Rendimento do sistema</p>
           </CardContent>
         </Card>
 
@@ -241,7 +292,7 @@ export default function Supervisory() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-white">{data.system.losses_mw.toFixed(2)}</div>
-            <p className="text-xs text-slate-400 mt-1">MW</p>
+            <p className="text-xs text-slate-400 mt-1">MW - Perdas no sistema</p>
           </CardContent>
         </Card>
       </div>
@@ -284,36 +335,35 @@ export default function Supervisory() {
               </CardContent>
             </Card>
 
-            {/* Status do Sistema */}
+            {/* Conversores */}
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  Status do Sistema
-                  {getStatusBadge(data.system.status)}
-                </CardTitle>
-                <CardDescription>Indicadores gerais de operação</CardDescription>
+                <CardTitle>Conversores</CardTitle>
+                <CardDescription>Retificador e Inversor</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-400">Eficiência</span>
-                    <span className="text-white font-semibold">{data.system.efficiency.toFixed(2)}%</span>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-slate-400">Retificador</span>
+                    {getStatusBadge(data.converters.rectifier.status)}
                   </div>
-                  <div className="w-full bg-slate-700 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all"
-                      style={{ width: `${data.system.efficiency}%` }}
-                    />
+                  <div className="text-sm text-slate-300">
+                    Potência: {data.converters.rectifier.power_mw.toFixed(1)} MW
+                  </div>
+                  <div className="text-sm text-slate-300">
+                    Eficiência: {data.converters.rectifier.efficiency.toFixed(2)}%
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div>
-                    <p className="text-xs text-slate-400">Alarmes Ativos</p>
-                    <p className="text-2xl font-bold text-white">{data.alarms.length}</p>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-slate-400">Inversor</span>
+                    {getStatusBadge(data.converters.inverter.status)}
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Componentes</p>
-                    <p className="text-2xl font-bold text-white">{data.buses.length + data.transformers.length + 2}</p>
+                  <div className="text-sm text-slate-300">
+                    Potência: {data.converters.inverter.power_mw.toFixed(1)} MW
+                  </div>
+                  <div className="text-sm text-slate-300">
+                    Eficiência: {data.converters.inverter.efficiency.toFixed(2)}%
                   </div>
                 </div>
               </CardContent>
@@ -323,27 +373,23 @@ export default function Supervisory() {
 
         {/* Barramentos */}
         <TabsContent value="buses" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {data.buses.map((bus) => (
               <Card key={bus.id} className="bg-slate-800/50 border-slate-700">
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between text-base">
+                  <CardTitle className="flex items-center justify-between">
                     {bus.name}
                     {getStatusBadge(bus.status)}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-400">Tensão (pu)</span>
-                    <span className="text-lg font-bold text-white">{bus.voltage_pu.toFixed(4)}</span>
+                    <span className="text-slate-400">Tensão (p.u.)</span>
+                    <span className="font-semibold text-white">{bus.voltage_pu.toFixed(3)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-400">Tensão (kV)</span>
-                    <span className="text-lg font-bold text-white">{bus.voltage_kv.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${getStatusColor(bus.status)} animate-pulse`} />
-                    <span className="text-xs text-slate-400">Status: {bus.status}</span>
+                    <span className="text-slate-400">Tensão (kV)</span>
+                    <span className="font-semibold text-white">{bus.voltage_kv.toFixed(1)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -354,36 +400,22 @@ export default function Supervisory() {
         {/* Transformadores */}
         <TabsContent value="transformers" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {data.transformers.map((trafo) => (
-              <Card key={trafo.id} className="bg-slate-800/50 border-slate-700">
+            {data.transformers.map((transformer) => (
+              <Card key={transformer.id} className="bg-slate-800/50 border-slate-700">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    {trafo.name}
-                    {getStatusBadge(trafo.status)}
+                    {transformer.name}
+                    {getStatusBadge(transformer.status)}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Carregamento</span>
-                      <span className="text-white font-semibold">{trafo.loading_percent.toFixed(1)}%</span>
-                    </div>
-                    <div className="w-full bg-slate-700 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all ${
-                          trafo.loading_percent > 100
-                            ? "bg-red-500"
-                            : trafo.loading_percent > 85
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                        }`}
-                        style={{ width: `${Math.min(trafo.loading_percent, 100)}%` }}
-                      />
-                    </div>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Carregamento</span>
+                    <span className="font-semibold text-white">{transformer.loading_percent.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-slate-400">Potência</span>
-                    <span className="text-lg font-bold text-white">{trafo.power_mw.toFixed(1)} MW</span>
+                    <span className="text-slate-400">Potência</span>
+                    <span className="font-semibold text-white">{transformer.power_mw.toFixed(1)} MW</span>
                   </div>
                 </CardContent>
               </Card>
@@ -397,19 +429,18 @@ export default function Supervisory() {
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  Retificador (12-Pulse)
+                  Retificador
                   {getStatusBadge(data.converters.rectifier.status)}
                 </CardTitle>
-                <CardDescription>AC → DC</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Potência</span>
-                  <span className="text-2xl font-bold text-white">{data.converters.rectifier.power_mw.toFixed(1)} MW</span>
+                  <span className="font-semibold text-white">{data.converters.rectifier.power_mw.toFixed(1)} MW</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Eficiência</span>
-                  <span className="text-2xl font-bold text-white">{data.converters.rectifier.efficiency.toFixed(2)}%</span>
+                  <span className="font-semibold text-white">{data.converters.rectifier.efficiency.toFixed(2)}%</span>
                 </div>
               </CardContent>
             </Card>
@@ -417,19 +448,18 @@ export default function Supervisory() {
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  Inversor (12-Pulse)
+                  Inversor
                   {getStatusBadge(data.converters.inverter.status)}
                 </CardTitle>
-                <CardDescription>DC → AC</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Potência</span>
-                  <span className="text-2xl font-bold text-white">{data.converters.inverter.power_mw.toFixed(1)} MW</span>
+                  <span className="font-semibold text-white">{data.converters.inverter.power_mw.toFixed(1)} MW</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Eficiência</span>
-                  <span className="text-2xl font-bold text-white">{data.converters.inverter.efficiency.toFixed(2)}%</span>
+                  <span className="font-semibold text-white">{data.converters.inverter.efficiency.toFixed(2)}%</span>
                 </div>
               </CardContent>
             </Card>
@@ -441,72 +471,67 @@ export default function Supervisory() {
           <Card className="bg-slate-800/50 border-slate-700">
             <CardHeader>
               <CardTitle>Parâmetros de Simulação</CardTitle>
-              <CardDescription>Ajuste os parâmetros do circuito HVDC</CardDescription>
+              <CardDescription>Ajuste os parâmetros do sistema HVDC</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm text-slate-400">Tensão AC 1 (kV)</label>
-                  <span className="text-sm font-semibold text-white">{params.acVoltage1}</span>
-                </div>
+              <div>
+                <label className="text-sm font-medium text-slate-300">
+                  Tensão AC 1: {params.acVoltage1} kV
+                </label>
                 <Slider
                   value={[params.acVoltage1]}
-                  onValueChange={([value]) => setParams({ ...params, acVoltage1: value })}
-                  min={300}
-                  max={400}
-                  step={5}
-                  className="w-full"
+                  onValueChange={(value) => setParams({ ...params, acVoltage1: value[0] })}
+                  min={200}
+                  max={500}
+                  step={10}
+                  className="mt-2"
                 />
               </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm text-slate-400">Tensão AC 2 (kV)</label>
-                  <span className="text-sm font-semibold text-white">{params.acVoltage2}</span>
-                </div>
+              <div>
+                <label className="text-sm font-medium text-slate-300">
+                  Tensão AC 2: {params.acVoltage2} kV
+                </label>
                 <Slider
                   value={[params.acVoltage2]}
-                  onValueChange={([value]) => setParams({ ...params, acVoltage2: value })}
-                  min={200}
-                  max={300}
-                  step={5}
-                  className="w-full"
+                  onValueChange={(value) => setParams({ ...params, acVoltage2: value[0] })}
+                  min={100}
+                  max={400}
+                  step={10}
+                  className="mt-2"
                 />
               </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm text-slate-400">Tensão DC (kV)</label>
-                  <span className="text-sm font-semibold text-white">{params.dcVoltage.toFixed(2)}</span>
-                </div>
+              <div>
+                <label className="text-sm font-medium text-slate-300">
+                  Tensão DC: {params.dcVoltage.toFixed(2)} kV
+                </label>
                 <Slider
                   value={[params.dcVoltage]}
-                  onValueChange={([value]) => setParams({ ...params, dcVoltage: value })}
-                  min={380}
-                  max={500}
+                  onValueChange={(value) => setParams({ ...params, dcVoltage: value[0] })}
+                  min={200}
+                  max={600}
                   step={1}
-                  className="w-full"
+                  className="mt-2"
                 />
               </div>
 
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <label className="text-sm text-slate-400">Potência de Carga (MW)</label>
-                  <span className="text-sm font-semibold text-white">{params.loadPower}</span>
-                </div>
+              <div>
+                <label className="text-sm font-medium text-slate-300">
+                  Potência de Carga: {params.loadPower} MW
+                </label>
                 <Slider
                   value={[params.loadPower]}
-                  onValueChange={([value]) => setParams({ ...params, loadPower: value })}
-                  min={500}
-                  max={1500}
+                  onValueChange={(value) => setParams({ ...params, loadPower: value[0] })}
+                  min={100}
+                  max={3000}
                   step={50}
-                  className="w-full"
+                  className="mt-2"
                 />
               </div>
 
               <Button onClick={updateParams} className="w-full bg-blue-600 hover:bg-blue-700">
-                <Activity className="mr-2 h-4 w-4" />
-                Aplicar Parâmetros
+                Atualizar Simulação
               </Button>
             </CardContent>
           </Card>
