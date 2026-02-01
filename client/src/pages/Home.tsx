@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Zap, Activity, TrendingUp, Settings, Gauge, FileText } from "lucide-react";
+import { Loader2, Zap, Activity, TrendingUp, Settings, Gauge, FileText, Play } from "lucide-react";
 import { Link } from "wouter";
 import CircuitDiagram from "@/components/CircuitDiagram";
 import SimulationControls from "@/components/SimulationControls";
@@ -94,6 +94,12 @@ export default function Home() {
               <Button variant="outline" className="gap-2">
                 <Activity className="h-4 w-4" />
                 Eventos
+              </Button>
+            </Link>
+            <Link href="/tests">
+              <Button variant="outline" className="gap-2">
+                <Play className="h-4 w-4" />
+                Testes
               </Button>
             </Link>
             </div>
