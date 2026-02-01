@@ -810,6 +810,15 @@ export async function getAlarmResolutionStats(
 }> {
   try {
     const db = await getDatabase();
+    if (!db) {
+      return {
+        totalResolved: 0,
+        averageResolutionTime: 0,
+        criticalResolutionTime: 0,
+        warningResolutionTime: 0,
+        unresolvedCount: 0,
+      };
+    }
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
@@ -857,7 +866,7 @@ export async function getAlarmResolutionStats(
       unresolvedCount: unresolvedAlarms.length,
     };
   } catch (error) {
-    console.error("[Alarm Service] Error getting alarm resolution stats:", error);
+    console.warn("[Alarm Service] Error getting alarm resolution stats (using defaults):", error);
     return {
       totalResolved: 0,
       averageResolutionTime: 0,
