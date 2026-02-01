@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { monitoringService } from "../monitoring";
+// import { monitoringService } from "../monitoring"; // Disabled - requires Python
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -59,7 +59,7 @@ async function startServer() {
   }
 
   // Inicializar serviço de monitoramento WebSocket
-  monitoringService.initialize(server);
+  // monitoringService.initialize(server); // Disabled - requires Python
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
