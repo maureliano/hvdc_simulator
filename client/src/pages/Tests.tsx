@@ -1,31 +1,24 @@
 import { useState } from "react";
-import { Play, Download, Trash2, Plus, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Loader2, Play, Download, Trash2, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 
 interface TestResult {
   id: string;
   name: string;
-  status: "pending" | "running" | "completed" | "failed";
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-  acVoltage1: number;
-  acVoltage2: number;
-  dcVoltage: number;
-  loadPower: number;
-  results: {
+  timestamp: Date;
+  parameters: {
+    ac1_voltage: number;
+    ac2_voltage: number;
+    dc_voltage: number;
+    power_mva: number;
+    load_mw: number;
+  };
+  results?: {
     totalGeneration: number;
     totalLoad: number;
     efficiency: number;
@@ -33,489 +26,478 @@ interface TestResult {
     dcCurrent: number;
     rectifierEfficiency: number;
     inverterEfficiency: number;
+    acVoltage1: number;
+    acVoltage2: number;
+    dcVoltageRectifier: number;
+    dcVoltageInverter: number;
+    rectifierLoss: number;
+    inverterLoss: number;
+    powerTransmitted: number;
   };
+  status: "running" | "completed" | "failed";
   error?: string;
 }
 
 export default function Tests() {
-  const [tests, setTests] = useState<TestResult[]>([]);
-  const [newTestName, setNewTestName] = useState("");
-  const [isRunning, setIsRunning] = useState(false);
-  const [selectedTest, setSelectedTest] = useState<TestResult | null>(null);
+  const [testName, setTestName] = useState("");
+  const [testParams, setTestParams] = useState({
+    ac1_voltage: 345.0,
+    ac2_voltage: 230.0,
+    dc_voltage: 422.84,
+    power_mva: 1196.0,
+    load_mw: 1000.0,
+  });
 
-  // Mock test execution
-  const runTest = async (name: string) => {
-    if (!name.trim()) {
-      alert("Por favor, digite um nome para o teste");
+  const [testResults, setTestResults] = useState<TestResult[]>([]);
+  const [selectedTest, setSelectedTest] = useState<TestResult | null>(null);
+  const [expandedTest, setExpandedTest] = useState<string | null>(null);
+
+  // tRPC mutation for running tests
+  const runTestMutation = trpc.tests.runTest.useMutation({
+    onSuccess: (data) => {
+      const newTest: TestResult = {
+        id: `test-${Date.now()}`,
+        name: testName || `Test ${testResults.length + 1}`,
+        timestamp: new Date(),
+        parameters: testParams,
+        results: data.results,
+        status: data.success ? "completed" : "failed",
+        error: data.error,
+      };
+
+      setTestResults([newTest, ...testResults]);
+      setSelectedTest(newTest);
+      setTestName("");
+
+      if (data.success) {
+        toast.success("Simulação concluída com sucesso!");
+      } else {
+        toast.error(`Erro na simulação: ${data.error}`);
+      }
+    },
+    onError: (error) => {
+      toast.error(`Erro ao executar simulação: ${error.message}`);
+    },
+  });
+
+  const handleRunTest = () => {
+    if (!testName.trim()) {
+      toast.error("Por favor, insira um nome para o teste");
       return;
     }
 
-    const testId = Date.now().toString();
-    const newTest: TestResult = {
-      id: testId,
-      name,
-      status: "running",
-      startTime: Date.now(),
-      acVoltage1: 345,
-      acVoltage2: 230,
-      dcVoltage: 422.84,
-      loadPower: 1000,
-      results: {
-        totalGeneration: 0,
-        totalLoad: 0,
-        efficiency: 0,
-        losses: 0,
-        dcCurrent: 0,
-        rectifierEfficiency: 0,
-        inverterEfficiency: 0,
-      },
-    };
-
-    setTests((prev) => [newTest, ...prev]);
-    setIsRunning(true);
-
-    // Simulate test execution
-    setTimeout(() => {
-      const results = {
-        totalGeneration: 1050 + Math.random() * 100,
-        totalLoad: 1000,
-        efficiency: 96.5 + Math.random() * 2,
-        losses: 35 + Math.random() * 10,
-        dcCurrent: (1000 * 1000) / 422.84 + Math.random() * 50,
-        rectifierEfficiency: 98.5 + Math.random() * 0.5,
-        inverterEfficiency: 98.2 + Math.random() * 0.5,
-      };
-
-      setTests((prev) =>
-        prev.map((t) =>
-          t.id === testId
-            ? {
-                ...t,
-                status: "completed",
-                endTime: Date.now(),
-                duration: Date.now() - t.startTime,
-                results,
-              }
-            : t
-        )
-      );
-      setIsRunning(false);
-      setNewTestName("");
-    }, 3000);
+    runTestMutation.mutate({
+      name: testName,
+      ...testParams,
+    });
   };
 
-  const deleteTest = (id: string) => {
-    setTests((prev) => prev.filter((t) => t.id !== id));
-    if (selectedTest?.id === id) {
+  const handleDeleteTest = (testId: string) => {
+    setTestResults(testResults.filter((t) => t.id !== testId));
+    if (selectedTest?.id === testId) {
       setSelectedTest(null);
     }
+    toast.success("Teste deletado");
   };
 
-  const exportResults = (test: TestResult) => {
-    const csv = `Test Results - ${test.name}
-Date,${new Date(test.startTime).toLocaleString("pt-BR")}
-Duration,${test.duration ? (test.duration / 1000).toFixed(2) : "N/A"} seconds
+  const handleExportCSV = () => {
+    if (!selectedTest || !selectedTest.results) {
+      toast.error("Nenhum teste selecionado");
+      return;
+    }
 
-Parameters
-AC Voltage 1,${test.acVoltage1} kV
-AC Voltage 2,${test.acVoltage2} kV
-DC Voltage,${test.dcVoltage} kV
-Load Power,${test.loadPower} MW
-
-Results
-Total Generation,${test.results.totalGeneration.toFixed(2)} MW
-Total Load,${test.results.totalLoad.toFixed(2)} MW
-Efficiency,${test.results.efficiency.toFixed(2)} %
-Losses,${test.results.losses.toFixed(2)} MW
-DC Current,${test.results.dcCurrent.toFixed(3)} kA
-Rectifier Efficiency,${test.results.rectifierEfficiency.toFixed(2)} %
-Inverter Efficiency,${test.results.inverterEfficiency.toFixed(2)} %`;
+    const csv = [
+      ["Parâmetro", "Valor"],
+      ["Nome do Teste", selectedTest.name],
+      ["Data/Hora", selectedTest.timestamp.toLocaleString("pt-BR")],
+      ["", ""],
+      ["PARÂMETROS DE ENTRADA", ""],
+      ["Tensão AC1 (kV)", selectedTest.parameters.ac1_voltage],
+      ["Tensão AC2 (kV)", selectedTest.parameters.ac2_voltage],
+      ["Tensão DC (kV)", selectedTest.parameters.dc_voltage],
+      ["Potência (MVA)", selectedTest.parameters.power_mva],
+      ["Carga (MW)", selectedTest.parameters.load_mw],
+      ["", ""],
+      ["RESULTADOS", ""],
+      ["Geração Total (MW)", selectedTest.results.totalGeneration.toFixed(2)],
+      ["Carga Total (MW)", selectedTest.results.totalLoad.toFixed(2)],
+      ["Eficiência (%)", selectedTest.results.efficiency.toFixed(2)],
+      ["Perdas Totais (MW)", selectedTest.results.losses.toFixed(2)],
+      ["Corrente DC (A)", selectedTest.results.dcCurrent.toFixed(2)],
+      ["Eficiência Retificador (%)", selectedTest.results.rectifierEfficiency.toFixed(2)],
+      ["Eficiência Inversor (%)", selectedTest.results.inverterEfficiency.toFixed(2)],
+      ["Tensão AC1 (kV)", selectedTest.results.acVoltage1.toFixed(2)],
+      ["Tensão AC2 (kV)", selectedTest.results.acVoltage2.toFixed(2)],
+      ["Tensão DC Retificador (kV)", selectedTest.results.dcVoltageRectifier.toFixed(2)],
+      ["Tensão DC Inversor (kV)", selectedTest.results.dcVoltageInverter.toFixed(2)],
+      ["Perdas Retificador (MW)", selectedTest.results.rectifierLoss.toFixed(2)],
+      ["Perdas Inversor (MW)", selectedTest.results.inverterLoss.toFixed(2)],
+      ["Potência Transmitida (MW)", selectedTest.results.powerTransmitted.toFixed(2)],
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `test-${test.id}.csv`;
+    a.download = `${selectedTest.name}-${Date.now()}.csv`;
     a.click();
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-500/10 text-green-500 border-green-500/20";
-      case "running":
-        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      case "failed":
-        return "bg-red-500/10 text-red-500 border-red-500/20";
-      default:
-        return "bg-gray-500/10 text-gray-500 border-gray-500/20";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle className="h-4 w-4" />;
-      case "running":
-        return <Clock className="h-4 w-4 animate-spin" />;
-      case "failed":
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
+    window.URL.revokeObjectURL(url);
+    toast.success("Arquivo exportado com sucesso");
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Play className="h-8 w-8 text-blue-500" />
-          Testes de Simulação HVDC
-        </h1>
-        <p className="text-slate-400 mt-1">Execute e analise simulações do sistema</p>
-      </div>
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">Testes de Simulação</h1>
+          <p className="text-slate-400">Execute e analise simulações HVDC com Pandapower</p>
+        </div>
 
-      <Tabs defaultValue="execute" className="space-y-4">
-        <TabsList className="bg-slate-800/50 border border-slate-700">
-          <TabsTrigger value="execute">Executar Teste</TabsTrigger>
-          <TabsTrigger value="history">Histórico ({tests.length})</TabsTrigger>
-          <TabsTrigger value="details">Detalhes</TabsTrigger>
-        </TabsList>
-
-        {/* Executar Teste */}
-        <TabsContent value="execute" className="space-y-4">
-          <Card className="bg-slate-800/50 border-slate-700">
-            <CardHeader>
-              <CardTitle>Novo Teste de Simulação</CardTitle>
-              <CardDescription>Configure e execute uma nova simulação HVDC</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Nome do Teste</label>
-                <Input
-                  placeholder="Ex: Teste de Carga Máxima"
-                  value={newTestName}
-                  onChange={(e) => setNewTestName(e.target.value)}
-                  disabled={isRunning}
-                  className="bg-slate-700/50 border-slate-600 text-white"
-                />
-              </div>
-
-              <Alert className="bg-blue-500/10 border-blue-500/20">
-                <AlertCircle className="h-4 w-4 text-blue-500" />
-                <AlertDescription className="text-blue-300">
-                  Este teste usa parâmetros padrão: AC 345/230 kV, DC 422.84 kV, Carga 1000 MW
-                </AlertDescription>
-              </Alert>
-
-              <Button
-                onClick={() => runTest(newTestName)}
-                disabled={isRunning}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                {isRunning ? "Executando..." : "Executar Teste"}
-              </Button>
-
-              {isRunning && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 animate-spin text-blue-500" />
-                    <span className="text-sm text-slate-300">Simulação em andamento...</span>
-                  </div>
-                  <div className="w-full bg-slate-700 rounded-full h-2">
-                    <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: "66%" }} />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Testes Recentes */}
-          {tests.length > 0 && (
-            <Card className="bg-slate-800/50 border-slate-700">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Panel - Test Configuration */}
+          <div className="lg:col-span-1">
+            <Card className="bg-slate-900 border-slate-800">
               <CardHeader>
-                <CardTitle>Testes Recentes</CardTitle>
+                <CardTitle>Novo Teste</CardTitle>
+                <CardDescription>Configure os parâmetros da simulação</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {tests.slice(0, 3).map((test) => (
-                    <div
-                      key={test.id}
-                      className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg border border-slate-600"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${getStatusColor(test.status)}`}>
-                          {getStatusIcon(test.status)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-white">{test.name}</p>
-                          <p className="text-xs text-slate-400">
-                            {new Date(test.startTime).toLocaleTimeString("pt-BR")}
-                          </p>
-                        </div>
-                      </div>
-                      <span className={`text-xs px-2 py-1 rounded border ${getStatusColor(test.status)}`}>
-                        {test.status === "completed" && "Concluído"}
-                        {test.status === "running" && "Executando"}
-                        {test.status === "failed" && "Erro"}
-                        {test.status === "pending" && "Pendente"}
-                      </span>
-                    </div>
-                  ))}
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-300">Nome do Teste</label>
+                  <Input
+                    value={testName}
+                    onChange={(e) => setTestName(e.target.value)}
+                    placeholder="Ex: Teste de Carga Máxima"
+                    className="bg-slate-800 border-slate-700 text-white mt-1"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
 
-        {/* Histórico */}
-        <TabsContent value="history" className="space-y-4">
-          <Card className="bg-slate-800/50 border-slate-700">
-            <CardHeader>
-              <CardTitle>Histórico de Testes</CardTitle>
-              <CardDescription>Lista de todos os testes executados</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tests.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-slate-400">Nenhum teste executado ainda</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-slate-700">
-                        <TableHead className="text-slate-300">Nome</TableHead>
-                        <TableHead className="text-slate-300">Status</TableHead>
-                        <TableHead className="text-slate-300">Duração</TableHead>
-                        <TableHead className="text-slate-300">Data/Hora</TableHead>
-                        <TableHead className="text-slate-300">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tests.map((test) => (
-                        <TableRow key={test.id} className="border-slate-700 hover:bg-slate-700/30">
-                          <TableCell className="text-white font-semibold">{test.name}</TableCell>
-                          <TableCell>
-                            <div className={`inline-flex items-center gap-2 px-2 py-1 rounded border ${getStatusColor(test.status)}`}>
-                              {getStatusIcon(test.status)}
-                              <span className="text-xs">
-                                {test.status === "completed" && "Concluído"}
-                                {test.status === "running" && "Executando"}
-                                {test.status === "failed" && "Erro"}
-                                {test.status === "pending" && "Pendente"}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-slate-300">
-                            {test.duration ? `${(test.duration / 1000).toFixed(2)}s` : "-"}
-                          </TableCell>
-                          <TableCell className="text-slate-300 text-sm">
-                            {new Date(test.startTime).toLocaleString("pt-BR")}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setSelectedTest(test)}
-                                className="text-blue-400 hover:text-blue-300"
-                              >
-                                Ver
-                              </Button>
-                              {test.status === "completed" && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => exportResults(test)}
-                                  className="text-green-400 hover:text-green-300"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => deleteTest(test.id)}
-                                className="text-red-400 hover:text-red-300"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Detalhes */}
-        <TabsContent value="details" className="space-y-4">
-          {selectedTest ? (
-            <>
-              <Card className="bg-slate-800/50 border-slate-700">
-                <CardHeader>
-                  <CardTitle>{selectedTest.name}</CardTitle>
-                  <CardDescription>
-                    Executado em {new Date(selectedTest.startTime).toLocaleString("pt-BR")}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Parâmetros */}
+                <div className="space-y-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Parâmetros de Entrada</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
-                        <p className="text-slate-400 text-sm">Tensão AC 1</p>
-                        <p className="text-2xl font-bold text-white">{selectedTest.acVoltage1}</p>
-                        <p className="text-xs text-slate-500">kV</p>
-                      </div>
-                      <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
-                        <p className="text-slate-400 text-sm">Tensão AC 2</p>
-                        <p className="text-2xl font-bold text-white">{selectedTest.acVoltage2}</p>
-                        <p className="text-xs text-slate-500">kV</p>
-                      </div>
-                      <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
-                        <p className="text-slate-400 text-sm">Tensão DC</p>
-                        <p className="text-2xl font-bold text-white">{selectedTest.dcVoltage.toFixed(2)}</p>
-                        <p className="text-xs text-slate-500">kV</p>
-                      </div>
-                      <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
-                        <p className="text-slate-400 text-sm">Carga</p>
-                        <p className="text-2xl font-bold text-white">{selectedTest.loadPower}</p>
-                        <p className="text-xs text-slate-500">MW</p>
-                      </div>
-                    </div>
+                    <label className="text-sm font-medium text-slate-300">
+                      Tensão AC1 (kV): {testParams.ac1_voltage}
+                    </label>
+                    <input
+                      type="range"
+                      min="200"
+                      max="500"
+                      step="5"
+                      value={testParams.ac1_voltage}
+                      onChange={(e) =>
+                        setTestParams({ ...testParams, ac1_voltage: parseFloat(e.target.value) })
+                      }
+                      className="w-full mt-1"
+                    />
                   </div>
 
-                  {/* Resultados */}
-                  {selectedTest.status === "completed" && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-4">Resultados da Simulação</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-green-500/10 p-4 rounded-lg border border-green-500/20">
-                          <p className="text-green-400 text-sm">Geração Total</p>
-                          <p className="text-2xl font-bold text-white">
-                            {selectedTest.results.totalGeneration.toFixed(1)}
-                          </p>
-                          <p className="text-xs text-slate-400">MW</p>
-                        </div>
-                        <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/20">
-                          <p className="text-blue-400 text-sm">Carga Total</p>
-                          <p className="text-2xl font-bold text-white">
-                            {selectedTest.results.totalLoad.toFixed(1)}
-                          </p>
-                          <p className="text-xs text-slate-400">MW</p>
-                        </div>
-                        <div className="bg-yellow-500/10 p-4 rounded-lg border border-yellow-500/20">
-                          <p className="text-yellow-400 text-sm">Eficiência</p>
-                          <p className="text-2xl font-bold text-white">
-                            {selectedTest.results.efficiency.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-slate-400">%</p>
-                        </div>
-                        <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/20">
-                          <p className="text-red-400 text-sm">Perdas</p>
-                          <p className="text-2xl font-bold text-white">
-                            {selectedTest.results.losses.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-slate-400">MW</p>
-                        </div>
-                        <div className="bg-purple-500/10 p-4 rounded-lg border border-purple-500/20">
-                          <p className="text-purple-400 text-sm">Corrente DC</p>
-                          <p className="text-2xl font-bold text-white">
-                            {selectedTest.results.dcCurrent.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-slate-400">kA</p>
-                        </div>
-                        <div className="bg-cyan-500/10 p-4 rounded-lg border border-cyan-500/20">
-                          <p className="text-cyan-400 text-sm">Duração</p>
-                          <p className="text-2xl font-bold text-white">
-                            {selectedTest.duration ? (selectedTest.duration / 1000).toFixed(2) : "-"}
-                          </p>
-                          <p className="text-xs text-slate-400">segundos</p>
-                        </div>
-                      </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-300">
+                      Tensão AC2 (kV): {testParams.ac2_voltage}
+                    </label>
+                    <input
+                      type="range"
+                      min="100"
+                      max="400"
+                      step="5"
+                      value={testParams.ac2_voltage}
+                      onChange={(e) =>
+                        setTestParams({ ...testParams, ac2_voltage: parseFloat(e.target.value) })
+                      }
+                      className="w-full mt-1"
+                    />
+                  </div>
 
-                      {/* Eficiências dos Conversores */}
-                      <div className="mt-6">
-                        <h4 className="text-md font-semibold text-white mb-3">Eficiência dos Conversores</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
-                            <p className="text-slate-400 text-sm">Retificador</p>
-                            <p className="text-2xl font-bold text-white">
-                              {selectedTest.results.rectifierEfficiency.toFixed(2)}
-                            </p>
-                            <p className="text-xs text-slate-500">%</p>
-                          </div>
-                          <div className="bg-slate-700/30 p-4 rounded-lg border border-slate-600">
-                            <p className="text-slate-400 text-sm">Inversor</p>
-                            <p className="text-2xl font-bold text-white">
-                              {selectedTest.results.inverterEfficiency.toFixed(2)}
-                            </p>
-                            <p className="text-xs text-slate-500">%</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <div>
+                    <label className="text-sm font-medium text-slate-300">
+                      Tensão DC (kV): {testParams.dc_voltage}
+                    </label>
+                    <input
+                      type="range"
+                      min="300"
+                      max="600"
+                      step="5"
+                      value={testParams.dc_voltage}
+                      onChange={(e) =>
+                        setTestParams({ ...testParams, dc_voltage: parseFloat(e.target.value) })
+                      }
+                      className="w-full mt-1"
+                    />
+                  </div>
 
-                  {selectedTest.status === "running" && (
-                    <Alert className="bg-blue-500/10 border-blue-500/20">
-                      <Clock className="h-4 w-4 text-blue-500 animate-spin" />
-                      <AlertDescription className="text-blue-300">
-                        Teste em execução... Por favor, aguarde
-                      </AlertDescription>
-                    </Alert>
-                  )}
+                  <div>
+                    <label className="text-sm font-medium text-slate-300">
+                      Potência (MVA): {testParams.power_mva}
+                    </label>
+                    <input
+                      type="range"
+                      min="500"
+                      max="2000"
+                      step="50"
+                      value={testParams.power_mva}
+                      onChange={(e) =>
+                        setTestParams({ ...testParams, power_mva: parseFloat(e.target.value) })
+                      }
+                      className="w-full mt-1"
+                    />
+                  </div>
 
-                  {selectedTest.status === "failed" && (
-                    <Alert className="bg-red-500/10 border-red-500/20">
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                      <AlertDescription className="text-red-300">
-                        {selectedTest.error || "Erro ao executar teste"}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
-
-              {selectedTest.status === "completed" && (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => exportResults(selectedTest)}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar Resultados (CSV)
-                  </Button>
-                  <Button
-                    onClick={() => setSelectedTest(null)}
-                    variant="outline"
-                    className="flex-1 border-slate-600"
-                  >
-                    Fechar
-                  </Button>
+                  <div>
+                    <label className="text-sm font-medium text-slate-300">
+                      Carga (MW): {testParams.load_mw}
+                    </label>
+                    <input
+                      type="range"
+                      min="500"
+                      max="1500"
+                      step="50"
+                      value={testParams.load_mw}
+                      onChange={(e) =>
+                        setTestParams({ ...testParams, load_mw: parseFloat(e.target.value) })
+                      }
+                      className="w-full mt-1"
+                    />
+                  </div>
                 </div>
-              )}
-            </>
-          ) : (
-            <Card className="bg-slate-800/50 border-slate-700">
-              <CardContent className="pt-6">
-                <div className="text-center py-8">
-                  <p className="text-slate-400">Selecione um teste no histórico para ver detalhes</p>
-                </div>
+
+                <Button
+                  onClick={handleRunTest}
+                  disabled={runTestMutation.isPending || !testName.trim()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 gap-2"
+                >
+                  {runTestMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Executando...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" />
+                      Executar Simulação
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+          </div>
+
+          {/* Right Panel - Results */}
+          <div className="lg:col-span-2">
+            <Tabs defaultValue="history" className="w-full">
+              <TabsList className="bg-slate-800 border-slate-700">
+                <TabsTrigger value="history">Histórico ({testResults.length})</TabsTrigger>
+                <TabsTrigger value="details" disabled={!selectedTest}>
+                  Detalhes
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="history" className="space-y-3">
+                {testResults.length === 0 ? (
+                  <Card className="bg-slate-900 border-slate-800">
+                    <CardContent className="pt-6 text-center text-slate-400">
+                      Nenhum teste executado ainda. Configure os parâmetros e clique em "Executar Simulação".
+                    </CardContent>
+                  </Card>
+                ) : (
+                  testResults.map((test) => (
+                    <Card
+                      key={test.id}
+                      className={`bg-slate-900 border-slate-800 cursor-pointer transition-colors ${
+                        selectedTest?.id === test.id ? "border-blue-500" : ""
+                      }`}
+                      onClick={() => setSelectedTest(test)}
+                    >
+                      <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white">{test.name}</h3>
+                            <p className="text-sm text-slate-400">
+                              {test.timestamp.toLocaleString("pt-BR")}
+                            </p>
+                            {test.status === "completed" && test.results && (
+                              <p className="text-sm text-green-400 mt-1">
+                                Eficiência: {test.results.efficiency.toFixed(2)}% | Perdas: {test.results.losses.toFixed(2)} MW
+                              </p>
+                            )}
+                            {test.status === "failed" && (
+                              <p className="text-sm text-red-400 mt-1">Erro: {test.error}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedTest(expandedTest === test.id ? null : test.id);
+                              }}
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTest(test.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-400" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {expandedTest === test.id && test.results && (
+                          <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-slate-400">Geração:</span>
+                              <p className="font-semibold text-white">
+                                {test.results.totalGeneration.toFixed(2)} MW
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Carga:</span>
+                              <p className="font-semibold text-white">{test.results.totalLoad.toFixed(2)} MW</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Corrente DC:</span>
+                              <p className="font-semibold text-white">{test.results.dcCurrent.toFixed(2)} A</p>
+                            </div>
+                            <div>
+                              <span className="text-slate-400">Tensão AC1:</span>
+                              <p className="font-semibold text-white">{test.results.acVoltage1.toFixed(2)} kV</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
+
+              <TabsContent value="details">
+                {selectedTest && selectedTest.results ? (
+                  <Card className="bg-slate-900 border-slate-800">
+                    <CardHeader>
+                      <CardTitle>{selectedTest.name}</CardTitle>
+                      <CardDescription>
+                        {selectedTest.timestamp.toLocaleString("pt-BR")}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div>
+                        <h3 className="font-semibold text-white mb-3">Parâmetros de Entrada</h3>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Tensão AC1</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.parameters.ac1_voltage} kV
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Tensão AC2</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.parameters.ac2_voltage} kV
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Tensão DC</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.parameters.dc_voltage} kV
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Potência</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.parameters.power_mva} MVA
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="font-semibold text-white mb-3">Resultados</h3>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Geração Total</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.results.totalGeneration.toFixed(2)} MW
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Carga Total</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.results.totalLoad.toFixed(2)} MW
+                            </p>
+                          </div>
+                          <div className="bg-green-900/20 p-3 rounded border border-green-800">
+                            <span className="text-green-400">Eficiência</span>
+                            <p className="font-semibold text-green-300">
+                              {selectedTest.results.efficiency.toFixed(2)}%
+                            </p>
+                          </div>
+                          <div className="bg-red-900/20 p-3 rounded border border-red-800">
+                            <span className="text-red-400">Perdas Totais</span>
+                            <p className="font-semibold text-red-300">
+                              {selectedTest.results.losses.toFixed(2)} MW
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Corrente DC</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.results.dcCurrent.toFixed(2)} A
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Potência Transmitida</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.results.powerTransmitted.toFixed(2)} MW
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="font-semibold text-white mb-3">Eficiências</h3>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Retificador</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.results.rectifierEfficiency.toFixed(2)}%
+                            </p>
+                          </div>
+                          <div className="bg-slate-800 p-3 rounded">
+                            <span className="text-slate-400">Inversor</span>
+                            <p className="font-semibold text-white">
+                              {selectedTest.results.inverterEfficiency.toFixed(2)}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={handleExportCSV}
+                        className="w-full bg-slate-800 hover:bg-slate-700 gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Exportar como CSV
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="bg-slate-900 border-slate-800">
+                    <CardContent className="pt-6 text-center text-slate-400">
+                      Selecione um teste para ver os detalhes
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

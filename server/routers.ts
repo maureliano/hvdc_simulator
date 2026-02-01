@@ -42,6 +42,7 @@ import {
 } from "./iff/alarm-service";
 import { runSimulation as runMemorySimulation } from "./hvdc-simulator-memory";
 import { eventsRouter } from "./routers_events";
+import { testsRouter } from "./routers/tests";
 
 
 // Helper function to run Python simulation
@@ -474,6 +475,9 @@ export const appRouter = router({
 
   // Events and Alarms History
   events: eventsRouter,
+
+  // Tests and Simulations
+  tests: testsRouter,
 });
 
 export type AppRouter = typeof appRouter;
