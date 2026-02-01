@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Play, Download, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import TestsChart from "@/components/TestsChart";
 
 interface TestResult {
   id: string;
@@ -477,9 +478,14 @@ export default function Tests() {
                         </div>
                       </div>
 
+                      <div className="mt-6 border-t border-slate-700 pt-6">
+                        <h3 className="font-semibold text-white mb-4">Gráficos de Análise</h3>
+                        <TestsChart results={selectedTest.results} />
+                      </div>
+
                       <Button
                         onClick={handleExportCSV}
-                        className="w-full bg-slate-800 hover:bg-slate-700 gap-2"
+                        className="w-full bg-slate-800 hover:bg-slate-700 gap-2 mt-6"
                       >
                         <Download className="h-4 w-4" />
                         Exportar como CSV
