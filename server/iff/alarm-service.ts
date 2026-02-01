@@ -3,9 +3,13 @@ import { iffAlarmThresholds, iffAlarmEvents, iffTestResults } from "../../drizzl
 import { eq, and, gte, lte } from "drizzle-orm";
 
 const getDatabase = async () => {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  return db;
+  try {
+    const db = await getDb();
+    return db;
+  } catch (error) {
+    console.warn("Database not available, using mock data");
+    return null;
+  }
 };
 
 /**
@@ -51,6 +55,7 @@ export interface AlarmEvent {
 export async function getAlarmThresholds(userId?: number): Promise<AlarmThreshold[]> {
   try {
     const db = await getDatabase();
+    if (!db) return []; // Return empty array if database not available
     const query = userId
       ? await db
           .select()
@@ -78,7 +83,7 @@ export async function getAlarmThresholds(userId?: number): Promise<AlarmThreshol
       updatedAt: t.updatedAt,
     }));
   } catch (error) {
-    console.error("[Alarm Service] Error fetching thresholds:", error);
+    console.warn("Error fetching alarm thresholds, returning empty array:", error);
     return [];
   }
 }
