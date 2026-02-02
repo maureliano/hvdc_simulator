@@ -89,26 +89,22 @@ export type InsertSimulationResult = typeof simulationResults.$inferInsert;
  */
 export const iffTestResults = pgTable("iff_test_results", {
   id: serial("id").primaryKey(),
-  userId: integer("userId"),
-  testName: varchar("testName", { length: 255 }).notNull(),
-  scenarioType: varchar("scenarioType", { length: 100 }).notNull(),
+  userId: integer("user_id"),
+  testName: varchar("test_name", { length: 255 }).notNull(),
+  scenarioType: varchar("scenario_type", { length: 100 }).notNull(),
   
   // IFF Dimensions (0-1 scale)
-  stateFidelity: doublePrecision("stateFidelity").notNull(),
-  dynamicsFidelity: doublePrecision("dynamicsFidelity").notNull(),
-  energyFidelity: doublePrecision("energyFidelity").notNull(),
-  stabilityFidelity: doublePrecision("stabilityFidelity").notNull(),
-  overallIFFScore: doublePrecision("overallIFFScore").notNull(),
-  
-  // System metrics
-  systemTrustworthiness: varchar("systemTrustworthiness", { length: 50 }).notNull(),
-  agenticDecision: varchar("agenticDecision", { length: 100 }).notNull(),
-  
-  executionTime: integer("executionTime").notNull(),
-  fullResults: text("fullResults"),
-  
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+  stateFidelity: doublePrecision("state_fidelity").notNull(),
+  dynamicsFidelity: doublePrecision("dynamics_fidelity").notNull(),
+  energyFidelity: doublePrecision("energy_fidelity").notNull(),
+  stabilityFidelity: doublePrecision("stability_fidelity").notNull(),
+  overallIFFScore: doublePrecision("overall_iff_score").notNull(),
+  systemTrustworthiness: varchar("system_trustworthiness", { length: 50 }).notNull(),
+  agenticDecision: varchar("agentic_decision", { length: 100 }).notNull(),
+  executionTime: integer("execution_time").notNull(),
+  fullResults: text("full_results"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export type IFFTestResult = typeof iffTestResults.$inferSelect;
