@@ -87,10 +87,7 @@ export default function Tests() {
       return;
     }
 
-    runTestMutation.mutate({
-      name: testName,
-      ...testParams,
-    });
+    runTestMutation.mutate(testParams);
   };
 
   const handleDeleteTest = (testId: string) => {
