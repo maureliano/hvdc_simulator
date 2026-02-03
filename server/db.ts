@@ -11,7 +11,14 @@ let _connection: postgres.Sql | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _connection = postgres(process.env.DATABASE_URL);
+      // Disable SSL verification for local development
+      // In production, use proper SSL certificates
+      _connection = postgres(process.env.DATABASE_URL, {
+        ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
+        max: 10, // Connection pool size
+        idle_timeout: 30, // Close idle connections after 30 seconds
+        connect_timeout: 10, // 10 second connection timeout
+      });
       _db = drizzle(_connection);
       
       console.log(`[Database] Connected to PostgreSQL`);
