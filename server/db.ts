@@ -11,18 +11,10 @@ let _connection: postgres.Sql | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // Disable SSL verification for local development
+      // Disable SSL for local development
       // In production, use proper SSL certificates
-      const isProduction = process.env.NODE_ENV === 'production';
-      
-      // Add sslmode=disable to DATABASE_URL if not in production
-      let dbUrl = process.env.DATABASE_URL || '';
-      if (!isProduction && !dbUrl.includes('sslmode')) {
-        dbUrl = dbUrl + (dbUrl.includes('?') ? '&' : '?') + 'sslmode=disable';
-      }
-      
-      _connection = postgres(dbUrl, {
-        ssl: isProduction ? { rejectUnauthorized: false } : false,
+      _connection = postgres(process.env.DATABASE_URL, {
+        ssl: false,
         max: 10,
         idle_timeout: 30,
         connect_timeout: 10,
