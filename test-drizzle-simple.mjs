@@ -1,0 +1,80 @@
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { pgTable, serial, varchar, text, doublePrecision, timestamp, integer } from "drizzle-orm/pg-core";
+
+const DATABASE_URL = "postgresql://hvdc_user:hvdc_secure_password_123@localhost:5432/hvdc_simulator";
+
+// Redefine o schema aqui para evitar problemas de import
+const iffTestResults = pgTable("iff_test_results", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  testName: varchar("test_name", { length: 255 }).notNull(),
+  scenarioType: varchar("scenario_type", { length: 100 }).notNull(),
+  stateFidelity: doublePrecision("state_fidelity").notNull(),
+  dynamicsFidelity: doublePrecision("dynamics_fidelity").notNull(),
+  energyFidelity: doublePrecision("energy_fidelity").notNull(),
+  stabilityFidelity: doublePrecision("stability_fidelity").notNull(),
+  overallIFFScore: doublePrecision("overall_iff_score").notNull(),
+  systemTrustworthiness: varchar("system_trustworthiness", { length: 50 }).notNull(),
+  agenticDecision: varchar("agentic_decision", { length: 100 }).notNull(),
+  executionTime: integer("execution_time").notNull(),
+  fullResults: text("full_results"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+async function testDrizzleQuery() {
+  const sql = postgres(DATABASE_URL);
+  const db = drizzle(sql);
+
+  try {
+    console.log("🔍 Testando query com Drizzle...\n");
+
+    // Teste 1: Query simples
+    console.log("1️⃣  Teste 1: Query simples com select()");
+    const result1 = await db.select().from(iffTestResults).limit(1);
+    console.log("✅ Sucesso! Resultado:", result1);
+
+    // Teste 2: Query com limit
+    console.log("\n2️⃣  Teste 2: Query com limit 5");
+    const result2 = await db.select().from(iffTestResults).limit(5);
+    console.log("✅ Sucesso! Registros encontrados:", result2.length);
+
+    // Teste 3: Insert
+    console.log("\n3️⃣  Teste 3: Insert de teste");
+    const result3 = await db.insert(iffTestResults).values({
+      testName: "Test from Drizzle " + new Date().toISOString(),
+      scenarioType: "TEST",
+      stateFidelity: 0.95,
+      dynamicsFidelity: 0.94,
+      energyFidelity: 0.93,
+      stabilityFidelity: 0.92,
+      overallIFFScore: 0.93,
+      systemTrustworthiness: "HIGH",
+      agenticDecision: "PROCEED",
+      executionTime: 1000,
+      fullResults: JSON.stringify({ test: true }),
+    });
+    console.log("✅ Insert bem-sucedido!");
+
+    // Teste 4: Query após insert
+    console.log("\n4️⃣  Teste 4: Query após insert");
+    const result4 = await db.select().from(iffTestResults);
+    console.log("✅ Sucesso! Total de registros:", result4.length);
+    if (result4.length > 0) {
+      console.log("Último registro:", result4[result4.length - 1]);
+    }
+
+    console.log("\n✅ TODOS OS TESTES PASSARAM! O Drizzle está funcionando corretamente.");
+
+  } catch (error) {
+    console.error("❌ Erro:", error.message);
+    console.error("\nDetalhes completos:");
+    console.error(error);
+    process.exit(1);
+  } finally {
+    await sql.end();
+  }
+}
+
+testDrizzleQuery();
