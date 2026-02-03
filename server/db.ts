@@ -13,11 +13,13 @@ export async function getDb() {
     try {
       // Disable SSL verification for local development
       // In production, use proper SSL certificates
+      const isProduction = process.env.NODE_ENV === 'production';
       _connection = postgres(process.env.DATABASE_URL, {
-        ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
+        ssl: isProduction ? { rejectUnauthorized: false } : false,
         max: 10, // Connection pool size
         idle_timeout: 30, // Close idle connections after 30 seconds
         connect_timeout: 10, // 10 second connection timeout
+        onnotice: () => {}, // Suppress notices
       });
       _db = drizzle(_connection);
       
